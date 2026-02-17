@@ -27,6 +27,7 @@ public class GameState {
     private int bidCount = 0;            // Number of bids made
     private boolean isGrabbing = false;  // Whether currently in grabbing mode
     private Map<String, Boolean> playerBids = new HashMap<>(); // Player bid status
+    private int redealCount = 0;         // Number of times cards were redealt due to all passing
 
     // Playing related fields
     private String lastPlayerId = null;  // Last player who played cards (for cycle tracking)
@@ -90,6 +91,9 @@ public class GameState {
 
     public int getBidCount() { return bidCount; }
     public void setBidCount(int bidCount) { this.bidCount = bidCount; }
+
+    public int getRedealCount() { return redealCount; }
+    public void setRedealCount(int redealCount) { this.redealCount = redealCount; }
 
     public boolean isGrabbing() { return isGrabbing; }
     public void setGrabbing(boolean grabbing) { isGrabbing = grabbing; }

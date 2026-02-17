@@ -638,6 +638,11 @@ public class GameService {
      * Determine if bidding should end
      */
     private boolean shouldEndBidding(GameState gameState) {
+        // Check if all players passed (no one called landlord) - need to redeal
+        if (allPlayersPassed(gameState)) {
+            return true;
+        }
+
         // If someone bid and all other players have had a chance to respond
         if (gameState.getFirstBidderId() != null) {
             int playersResponded = gameState.getPlayerBids().size();
@@ -681,9 +686,202 @@ public class GameService {
     }
 
     /**
+     * Check if all players passed on bidding (no one called landlord)
+     */
+    private boolean allPlayersPassed(GameState gameState) {
+        // If firstBidderId is null, no one has bid yet
+        if (gameState.getFirstBidderId() == null) {
+            // Check if all players have had a chance to bid
+            return gameState.getPlayerBids().size() >= gameState.getPlayers().size();
+        }
+        return false;
+    }
+
+    /**
+     * Redeal cards when all players pass on bidding
+     */
+    private void redealCards(GameState gameState) {
+        String broadcastGameId = gameState.getGameId();
+
+        // Increment redeal count
+        int redealCount = gameState.getRedealCount() + 1;
+        gameState.setRedealCount(redealCount);
+
+        // If we've redealt too many times, just make first player landlord
+        if (redealCount >= 3) {
+            // Reset bidding state and make first player landlord
+            gameState.setFirstBidderId(gameState.getPlayers().get(0).getId());
+            gameState.setLandlordId(gameState.getPlayers().get(0).getId());
+            gameState.setStatus(GameState.Status.PLAYING);
+            gameState.setCurrentPlayerId(gameState.getPlayers().get(0).getId());
+            gameState.setLastPlayerId(gameState.getPlayers().get(0).getId());
+
+            // Add landlord cards to landlord's hand
+            if (gameState.getLandlordCards() != null) {
+                gameState.getPlayers().get(0).getHand().addAll(gameState.getLandlordCards());
+            }
+
+            // Notify players
+            Map<String, Object> landlordData = new HashMap<>();
+            landlordData.put("landlordId", gameState.getPlayers().get(0).getId());
+            GameEvent landlordEvent = new GameEvent(
+                GameEvent.EventType.BID_RESPONSE,
+                broadcastGameId,
+                "LANDLORD_DETERMINED",
+                landlordData
+            );
+            messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, landlordEvent);
+
+            // Send updated hands
+            for (Player player : gameState.getPlayers()) {
+                Map<String, Object> dealData = new HashMap<>();
+                dealData.put("targetPlayerId", player.getId());
+                dealData.put("cards", player.getHand());
+                GameEvent dealEvent = new GameEvent(
+                    GameEvent.EventType.CARDS_DEAL,
+                    broadcastGameId,
+                    player.getId(),
+                    dealData
+                );
+                messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, dealEvent);
+            }
+
+            // Request landlord to play
+            Map<String, Object> firstPlayData = new HashMap<>();
+            firstPlayData.put("canPass", false);
+            GameEvent playRequest = new GameEvent(
+                GameEvent.EventType.PLAY_CARDS,
+                broadcastGameId,
+                gameState.getPlayers().get(0).getId(),
+                firstPlayData
+            );
+            messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, playRequest);
+            scheduleAIResponse(broadcastGameId);
+            return;
+        }
+
+        // Reset bidding state
+        gameState.setCurrentPlayerId(null);
+        gameState.setBidRound(0);
+        gameState.setFirstBidderId(null);
+        gameState.setBidCount(0);
+        gameState.setGrabbing(false);
+        gameState.getPlayerBids().clear();
+
+        // Create and shuffle deck again
+        List<Card> deck = createDeck();
+        Collections.shuffle(deck, random);
+
+        // Deal cards to players
+        for (int i = 0; i < 3; i++) {
+            Player player = gameState.getPlayers().get(i);
+            List<Card> hand = deck.subList(i * 17, (i + 1) * 17);
+            player.setHand(new ArrayList<>(hand));
+        }
+
+        // Remaining 3 cards are landlord cards
+        List<Card> landlordCards = deck.subList(51, 54);
+        gameState.setLandlordCards(landlordCards);
+
+        // Set to bidding state
+        gameState.setStatus(GameState.Status.BIDDING);
+
+        // Find the first player to bid - start from landlord's next player (clockwise)
+        String firstBidPlayerId;
+        String previousLandlordId = gameState.getLandlordId();
+
+        if (previousLandlordId != null && !previousLandlordId.isEmpty()) {
+            // Find landlord's index and use the next player (clockwise)
+            int landlordIndex = -1;
+            for (int i = 0; i < gameState.getPlayers().size(); i++) {
+                if (gameState.getPlayers().get(i).getId().equals(previousLandlordId)) {
+                    landlordIndex = i;
+                    break;
+                }
+            }
+            if (landlordIndex >= 0) {
+                // Next player clockwise (index + 1, wrap around)
+                int nextPlayerIndex = (landlordIndex + 1) % gameState.getPlayers().size();
+                firstBidPlayerId = gameState.getPlayers().get(nextPlayerIndex).getId();
+            } else {
+                // If landlord not found, use first player
+                firstBidPlayerId = gameState.getPlayers().get(0).getId();
+            }
+        } else {
+            // First game, start from first player
+            firstBidPlayerId = gameState.getPlayers().get(0).getId();
+        }
+
+        gameState.setCurrentPlayerId(firstBidPlayerId);
+
+        // Notify all players about the redeal
+        Map<String, Object> redealData = new HashMap<>();
+        redealData.put("message", "所有人都不叫，重新发牌！");
+
+        GameEvent redealEvent = new GameEvent(
+            GameEvent.EventType.GAME_START,
+            broadcastGameId,
+            null,
+            redealData
+        );
+        messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, redealEvent);
+
+        // Send new cards to each player
+        for (Player player : gameState.getPlayers()) {
+            Map<String, Object> dealData = new HashMap<>();
+            dealData.put("targetPlayerId", player.getId());
+            dealData.put("cards", player.getHand());
+
+            GameEvent dealEvent = new GameEvent(
+                GameEvent.EventType.CARDS_DEAL,
+                broadcastGameId,
+                player.getId(),
+                dealData
+            );
+            messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, dealEvent);
+        }
+
+        // Notify all players of game start with new cards
+        Map<String, Integer> playerCardCounts = new HashMap<>();
+        for (Player p : gameState.getPlayers()) {
+            playerCardCounts.put(p.getId(), p.getHand() != null ? p.getHand().size() : 0);
+        }
+
+        Map<String, Object> startData = new HashMap<>();
+        startData.put("status", "BIDDING");
+        startData.put("playerCardCounts", playerCardCounts);
+
+        GameEvent startEvent = new GameEvent(
+            GameEvent.EventType.GAME_START,
+            broadcastGameId,
+            null,
+            startData
+        );
+        messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, startEvent);
+
+        // Request first player to bid
+        GameEvent bidRequest = new GameEvent(
+            GameEvent.EventType.BID_REQUEST,
+            broadcastGameId,
+            gameState.getPlayers().get(0).getId(),
+            "bid"
+        );
+        messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, bidRequest);
+
+        // Schedule AI response
+        scheduleAIResponse(broadcastGameId);
+    }
+
+    /**
      * Determine the landlord and start playing
      */
     private void determineLandlord(GameState gameState) {
+        // Check if all players passed - if so, redeal cards
+        if (allPlayersPassed(gameState)) {
+            redealCards(gameState);
+            return;
+        }
+
         String landlordId = gameState.getFirstBidderId();
 
         if (landlordId == null) {
