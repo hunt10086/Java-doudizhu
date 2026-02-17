@@ -267,11 +267,18 @@ const MessageHandler = ({ onGameStart }) => {
               dispatch({ type: 'SET_PLAYER_CARD_COUNTS', payload: playData.playerCardCounts });
             }
             if (playData.playerWon) {
-              // Find the winner player info
-              console.log('Player won, looking for player:', playData.playerId, 'in players:', state.players);
+              // Find the winner player info - prefer playerName from server, fallback to local lookup
+              console.log('Player won, looking for player:', playData.playerId, 'in players:', state.players, 'playerName from server:', playData.playerName);
               const winnerPlayer = state.players?.find(p => p.id === playData.playerId);
               console.log('Found winnerPlayer:', winnerPlayer);
-              const winnerPayload = winnerPlayer ? { ...winnerPlayer } : { id: playData.playerId, name: '未知玩家' };
+              // Use server-provided name if available, otherwise use local player name
+              const winnerName = playData.playerName || winnerPlayer?.name || '未知玩家';
+              const winnerPayload = {
+                id: playData.playerId,
+                name: winnerName,
+                isHost: winnerPlayer?.isHost || false,
+                position: winnerPlayer?.position
+              };
               dispatch({ type: 'SET_WINNER', payload: winnerPayload });
               dispatch({ type: 'SET_GAME_STATE', payload: 'finished' });
               console.log('Player won:', playData.playerId, 'winnerPayload:', winnerPayload);

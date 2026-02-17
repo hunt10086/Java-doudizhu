@@ -186,6 +186,7 @@ export const WinnerOverlay = styled.div`
   align-items: center;
   z-index: 1000;
   animation: ${winnerSlide} 0.5s ease-out;
+  pointer-events: all;
 `;
 
 export const WinnerBox = styled.div`

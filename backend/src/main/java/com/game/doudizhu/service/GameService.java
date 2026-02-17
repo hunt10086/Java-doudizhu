@@ -843,6 +843,15 @@ public class GameService {
         playData.put("nextPlayerId", nextPlayer.getId());
         playData.put("playerWon", playerWon);
 
+        // Add player name for winner display
+        Player winner = gameState.getPlayers().stream()
+            .filter(p -> p.getId().equals(playerId))
+            .findFirst()
+            .orElse(null);
+        if (winner != null) {
+            playData.put("playerName", winner.getName());
+        }
+
         // Add hand card counts for all players (without revealing actual cards)
         Map<String, Integer> playerCardCounts = new HashMap<>();
         for (Player p : gameState.getPlayers()) {
