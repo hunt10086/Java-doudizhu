@@ -21,6 +21,15 @@ const WinnerDisplay = ({ winner, isLandlord, onNextRound, isHost }) => {
 
   const winnerName = winner?.name || '未知玩家';
 
+  const handleClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('WinnerDisplay button clicked, isHost:', isHost);
+    if (onNextRound) {
+      onNextRound();
+    }
+  };
+
   return (
     <>
       <ConfettiContainer>
@@ -35,8 +44,8 @@ const WinnerDisplay = ({ winner, isLandlord, onNextRound, isHost }) => {
           />
         ))}
       </ConfettiContainer>
-      <WinnerOverlay>
-        <WinnerBox $isLandlord={isLandlord}>
+      <WinnerOverlay onClick={(e) => e.stopPropagation()}>
+        <WinnerBox $isLandlord={isLandlord} onClick={(e) => e.stopPropagation()}>
           <WinnerTitle>游戏结束</WinnerTitle>
           <WinnerName $isLandlord={isLandlord}>
             {winnerName}
@@ -45,7 +54,10 @@ const WinnerDisplay = ({ winner, isLandlord, onNextRound, isHost }) => {
             {isLandlord ? '地主获胜!' : '农民获胜!'}
           </WinnerSubtitle>
           {isHost && (
-            <NextRoundButton onClick={onNextRound}>
+            <NextRoundButton
+              onClick={handleClick}
+              type="button"
+            >
               再来一局
             </NextRoundButton>
           )}
@@ -68,8 +80,11 @@ const NextRoundButton = styled.button`
   border: none;
   border-radius: 30px;
   cursor: pointer;
+  pointer-events: all;
   transition: all 0.3s ease;
   box-shadow: 0 5px 20px rgba(56, 239, 125, 0.4);
+  position: relative;
+  z-index: 1001;
 
   &:hover {
     transform: translateY(-3px);
