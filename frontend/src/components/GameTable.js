@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import Card from './Card';
 import { useGame } from '../contexts/GameContext';
+import playerAvatar from '../../ava.jpg';
 
 const TableContainer = styled.div`
   flex: 1;
@@ -20,10 +21,32 @@ const PlayerSide = styled.div`
   width: 150px;
 `;
 
+const PlayerCard = styled.div`
+  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255,255,255,0.2);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  backdrop-filter: blur(5px);
+`;
+
+const PlayerAvatar = styled.img`
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid ${props => props.$isCurrent ? '#4ecdc4' : 'rgba(255,255,255,0.3)'};
+  box-shadow: ${props => props.$isCurrent ? '0 0 15px rgba(78,205,196,0.5)' : '0 2px 8px rgba(0,0,0,0.3)'};
+  object-fit: cover;
+`;
+
 const PlayerName = styled.div`
   font-size: 14px;
   font-weight: ${props => props.$isCurrent ? 'bold' : 'normal'};
-  color: ${props => props.$isCurrent ? '#4ecdc4' : 'rgba(255,255,255,0.8)'};
+  color: ${props => props.$isCurrent ? '#4ecdc4' : 'rgba(255,255,255,0.9)'};
   text-shadow: ${props => props.$isCurrent ? '0 0 10px #4ecdc4' : '0 1px 3px rgba(0,0,0,0.5)'};
   transition: all 0.3s ease;
 `;
@@ -131,13 +154,17 @@ const GameTable = () => {
     <TableContainer>
       {/* Left player (上家) */}
       <PlayerSide>
-        <PlayerName $isCurrent={leftPlayer && isCurrentPlayer(leftPlayer.id)}>
-          {leftPlayer?.name || '等待加入...'}
-        </PlayerName>
-        {leftPlayer && isLandlord(leftPlayer.id) && <LandlordBadge>地主</LandlordBadge>}
-        <PlayerCards>
-          {/* Show placeholder cards for other players */}
-        </PlayerCards>
+        <PlayerCard>
+          <PlayerAvatar
+            src={playerAvatar}
+            alt="头像"
+            $isCurrent={leftPlayer && isCurrentPlayer(leftPlayer.id)}
+          />
+          <PlayerName $isCurrent={leftPlayer && isCurrentPlayer(leftPlayer.id)}>
+            {leftPlayer?.name || '等待加入...'}
+          </PlayerName>
+          {leftPlayer && isLandlord(leftPlayer.id) && <LandlordBadge>地主</LandlordBadge>}
+        </PlayerCard>
         <CardCount>{leftPlayer ? `${getCardCount(leftPlayer.id)}张牌` : ''}</CardCount>
       </PlayerSide>
 
@@ -164,13 +191,17 @@ const GameTable = () => {
 
       {/* Right player (下家) */}
       <PlayerSide>
-        <PlayerName $isCurrent={rightPlayer && isCurrentPlayer(rightPlayer.id)}>
-          {rightPlayer?.name || '等待加入...'}
-        </PlayerName>
-        {rightPlayer && isLandlord(rightPlayer.id) && <LandlordBadge>地主</LandlordBadge>}
-        <PlayerCards>
-          {/* Show placeholder cards for other players */}
-        </PlayerCards>
+        <PlayerCard>
+          <PlayerAvatar
+            src={playerAvatar}
+            alt="头像"
+            $isCurrent={rightPlayer && isCurrentPlayer(rightPlayer.id)}
+          />
+          <PlayerName $isCurrent={rightPlayer && isCurrentPlayer(rightPlayer.id)}>
+            {rightPlayer?.name || '等待加入...'}
+          </PlayerName>
+          {rightPlayer && isLandlord(rightPlayer.id) && <LandlordBadge>地主</LandlordBadge>}
+        </PlayerCard>
         <CardCount>{rightPlayer ? `${getCardCount(rightPlayer.id)}张牌` : ''}</CardCount>
       </PlayerSide>
     </TableContainer>

@@ -286,7 +286,16 @@ public class GameController {
 
         // Add sender name to the data
         Map<String, Object> chatData = new HashMap<>();
-        chatData.put("text", event.getData());
+        // Handle both string and object data
+        Object data = event.getData();
+        if (data instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> dataMap = (Map<String, Object>) data;
+            chatData.put("text", dataMap.get("text"));
+            chatData.put("messageId", dataMap.get("messageId"));
+        } else {
+            chatData.put("text", data);
+        }
         chatData.put("senderName", senderName);
         chatData.put("playerId", playerId);
 

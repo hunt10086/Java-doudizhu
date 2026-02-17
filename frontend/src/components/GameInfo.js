@@ -1,6 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { useGame } from '../contexts/GameContext';
+import ConnectionManager from '../services/ConnectionManager';
 
 const InfoContainer = styled.div`
   background: rgba(255, 255, 255, 0.1);
@@ -40,6 +41,20 @@ const StatusLabel = styled.div`
 const GameInfo = () => {
   const { state } = useGame();
 
+  // Get room ID from ConnectionManager
+  const gameId = ConnectionManager.getGameId() || '未加入';
+
+  // Map game state to display text
+  const getGameStateText = () => {
+    switch (state.gameState) {
+      case 'waiting': return '等待中';
+      case 'bidding': return '叫地主';
+      case 'playing': return '游戏中';
+      case 'finished': return '已结束';
+      default: return '等待中';
+    }
+  };
+
   return (
     <InfoContainer>
       <GameStatus>
@@ -49,11 +64,7 @@ const GameInfo = () => {
         </StatusItem>
 
         <StatusItem>
-          <StatusValue>
-            {state.gameState === 'waiting' ? '等待中' :
-             state.gameState === 'playing' ? '游戏中' :
-             state.gameState === 'finished' ? '已结束' : '未知'}
-          </StatusValue>
+          <StatusValue>{getGameStateText()}</StatusValue>
           <StatusLabel>状态</StatusLabel>
         </StatusItem>
 
@@ -68,7 +79,7 @@ const GameInfo = () => {
       <div style={{ textAlign: 'right' }}>
         <h3 style={{ margin: '0 0 5px 0', fontSize: '16px' }}>斗地主游戏</h3>
         <p style={{ margin: '0', fontSize: '12px', opacity: 0.8 }}>
-          当前房间: Room #{Math.floor(Math.random() * 1000)}
+          当前房间: #{gameId}
         </p>
       </div>
     </InfoContainer>

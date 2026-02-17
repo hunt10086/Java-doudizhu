@@ -109,6 +109,7 @@ const ChatPanel = () => {
   const { state } = useGame();
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
+  const [pendingMessageId, setPendingMessageId] = useState(null); // Track pending message to avoid duplicate
 
   useEffect(() => {
     // Add system welcome message
@@ -130,10 +131,19 @@ const ChatPanel = () => {
         // data.data can be either an object or a string
         let senderName = '未知玩家';
         let text = '';
+        let messageId = data.data?.messageId || Date.now();
+
+        // Skip if this is our own message that we just sent (already added locally)
+        if (isOwn && pendingMessageId === messageId) {
+          console.log('Skipping duplicate own message');
+          setPendingMessageId(null);
+          return;
+        }
 
         if (typeof data.data === 'object' && data.data !== null) {
           senderName = isOwn ? '我' : (data.data.senderName || '未知玩家');
           text = data.data.text || '';
+          messageId = data.data.messageId || messageId;
         } else if (typeof data.data === 'string') {
           // If data.data is a string, use it as text and get senderName from player lookup
           text = data.data;
@@ -143,7 +153,7 @@ const ChatPanel = () => {
         }
 
         const newMessage = {
-          id: Date.now(),
+          id: messageId,
           sender: senderName,
           text: text,
           timestamp: new Date().toLocaleTimeString(),
@@ -159,7 +169,7 @@ const ChatPanel = () => {
     return () => {
       connectionManager.removeMessageListener(handleChatMessage);
     };
-  }, []);
+  }, [pendingMessageId]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -172,12 +182,16 @@ const ChatPanel = () => {
   const handleSend = () => {
     if (inputValue.trim() === '') return;
 
-    // Send via WebSocket
-    connectionManager.sendChat(inputValue);
+    // Generate a unique message ID
+    const messageId = Date.now();
+    setPendingMessageId(messageId);
+
+    // Send via WebSocket with message ID
+    connectionManager.sendChat({ text: inputValue, messageId });
 
     // Add to local messages immediately
     const newMessage = {
-      id: Date.now(),
+      id: messageId,
       sender: '我',
       text: inputValue,
       timestamp: new Date().toLocaleTimeString(),
