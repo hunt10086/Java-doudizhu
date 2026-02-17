@@ -15,7 +15,9 @@ const initialState = {
   handCards: [],
   selectedCards: [],
   playerCardCounts: {},  // Store card counts for all players
-  canPass: true  // Whether current player can pass (不要)
+  canPass: true,  // Whether current player can pass (不要)
+  winner: null,  // Winner of the game
+  currentEffect: null  // Current card type effect to display
 };
 
 function gameReducer(state, action) {
@@ -32,6 +34,8 @@ function gameReducer(state, action) {
       return { ...state, landlordId: action.payload };
     case 'SET_CAN_PASS':
       return { ...state, canPass: action.payload };
+    case 'SET_WINNER':
+      return { ...state, winner: action.payload };
     case 'SET_ROUND':
       return { ...state, round: action.payload };
     case 'SET_SCORES':
@@ -83,6 +87,12 @@ function gameReducer(state, action) {
     case 'SET_PLAYER_CARD_COUNTS':
       // Update card counts for all players (for displaying other players' card count)
       return { ...state, playerCardCounts: action.payload };
+    case 'SET_CURRENT_EFFECT':
+      // Set current effect for special card type display
+      return { ...state, currentEffect: action.payload };
+    case 'ADD_PLAYER':
+      // Add a new player to the players array
+      return { ...state, players: [...(state.players || []), action.payload] };
     default:
       return state;
   }

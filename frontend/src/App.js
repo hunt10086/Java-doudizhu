@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled, { createGlobalStyle, keyframes } from 'styled-components';
 import GameTable from './components/GameTable';
-import PlayerPanel from './components/PlayerPanel';
 import GameControls from './components/GameControls';
 import ChatPanel from './components/ChatPanel';
 import GameInfo from './components/GameInfo';
@@ -11,10 +10,23 @@ import { GameProvider, useGame } from './contexts/GameContext';
 import RoomManager from './components/RoomManager';
 import Auth from './components/Auth';
 import axios from './utils/axiosConfig';
+import WinnerDisplay from './components/WinnerDisplay';
+import {
+  GameBackground,
+  HandCardsArea,
+  HandCardsLabel,
+  HandCardsList,
+  ControlsArea,
+  EffectContainer,
+  BombEffect,
+  EffectLabel,
+  CARD_TYPE_NAMES
+} from './components/GameEffects';
+import { CardUtils, CardType } from './utils/gameLogic';
 
 // Global styles
 const GlobalStyle = createGlobalStyle`
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
 
   * {
     margin: 0;
@@ -49,23 +61,8 @@ const cardDeal = keyframes`
 const AppContainer = styled.div`
   width: 100vw;
   height: 100vh;
-  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
   overflow: hidden;
   position: relative;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background:
-      radial-gradient(circle at 20% 80%, rgba(120, 0, 255, 0.15) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, rgba(255, 0, 128, 0.1) 0%, transparent 50%),
-      radial-gradient(circle at 50% 50%, rgba(0, 200, 255, 0.05) 0%, transparent 70%);
-    pointer-events: none;
-  }
 `;
 
 // Game layout - Full screen game area
@@ -73,8 +70,8 @@ const GameLayout = styled.div`
   display: flex;
   flex-direction: column;
   height: 100vh;
-  padding: 8px;
-  gap: 8px;
+  padding: 10px;
+  gap: 10px;
   position: relative;
   z-index: 1;
 `;
@@ -91,7 +88,7 @@ const TopBar = styled.div`
 const MainArea = styled.div`
   display: flex;
   flex: 1;
-  gap: 8px;
+  gap: 10px;
   min-height: 0;
   overflow: hidden;
 `;
@@ -110,72 +107,17 @@ const SidePanel = styled.div`
   width: 200px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
-`;
-
-// Opponent panel (top)
-const OpponentArea = styled.div`
-  flex: 0 0 auto;
-  min-height: 80px;
 `;
 
 // Bottom area - Hand cards and controls
 const BottomArea = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   flex-shrink: 0;
   animation: ${fadeIn} 0.6s ease-out;
-`;
-
-// Hand cards container
-const HandCardsSection = styled.div`
-  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
-  border-radius: 12px;
-  padding: 8px 12px;
-  border: 1px solid rgba(255,255,255,0.1);
-  backdrop-filter: blur(10px);
-  min-height: 70px;
-  display: flex;
-  flex-direction: column;
-`;
-
-const HandCardsLabel = styled.div`
-  color: rgba(255,255,255,0.6);
-  font-size: 10px;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-`;
-
-const HandCardsWrapper = styled.div`
-  flex: 1;
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 2px;
-  align-content: flex-start;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 4px 2px;
-  min-height: 50px;
-
-  &::-webkit-scrollbar {
-    height: 4px;
-  }
-  &::-webkit-scrollbar-track {
-    background: rgba(255,255,255,0.1);
-    border-radius: 2px;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.3);
-    border-radius: 2px;
-  }
-`;
-
-// Controls section
-const ControlsSection = styled.div`
-  flex-shrink: 0;
 `;
 
 // Card component styled for hand
@@ -199,6 +141,17 @@ const MessageHandler = ({ onGameStart }) => {
         case 'PLAYER_JOIN':
           if (data.data && data.data.id) {
             console.log('Player joined:', data.data);
+            // Add player to state if not already present
+            const existingPlayer = state.players?.find(p => p.id === data.data.id);
+            if (!existingPlayer && data.data.name) {
+              const newPlayer = {
+                id: data.data.id,
+                name: data.data.name,
+                position: data.data.position,
+                isHost: data.data.isHost || false
+              };
+              dispatch({ type: 'ADD_PLAYER', payload: newPlayer });
+            }
           }
           break;
 
@@ -291,6 +244,19 @@ const MessageHandler = ({ onGameStart }) => {
               }
               if (playData.cards) {
                 dispatch({ type: 'SET_CURRENT_CARDS', payload: playData.cards });
+
+                // Detect card type and show effect
+                const cardType = CardUtils.analyzeCards(playData.cards);
+                if (cardType && (cardType.type === CardType.BOMB || cardType.type === CardType.JOKER_BOMB ||
+                    cardType.type === CardType.STRAIGHT || cardType.type === CardType.DOUBLE_STRAIGHT ||
+                    cardType.type === CardType.AIRPLANE)) {
+                  console.log('Special card type detected:', cardType.type);
+                  dispatch({ type: 'SET_CURRENT_EFFECT', payload: cardType });
+                  // Clear effect after 2 seconds
+                  setTimeout(() => {
+                    dispatch({ type: 'SET_CURRENT_EFFECT', payload: null });
+                  }, 2000);
+                }
               }
               if (playData.playerId === currentPlayerId && playData.cards) {
                 dispatch({ type: 'UPDATE_HAND_CARDS', payload: playData.cards });
@@ -301,6 +267,9 @@ const MessageHandler = ({ onGameStart }) => {
               dispatch({ type: 'SET_PLAYER_CARD_COUNTS', payload: playData.playerCardCounts });
             }
             if (playData.playerWon) {
+              // Find the winner player info
+              const winnerPlayer = state.players?.find(p => p.id === playData.playerId);
+              dispatch({ type: 'SET_WINNER', payload: winnerPlayer || { id: playData.playerId } });
               dispatch({ type: 'SET_GAME_STATE', payload: 'finished' });
               console.log('Player won:', playData.playerId);
             }
@@ -370,7 +339,8 @@ function App() {
     myPlayerId: null,
     handCards: [],
     selectedCards: [],
-    playerCardCounts: {}
+    playerCardCounts: {},
+    currentEffect: null  // For displaying card type effects
   };
 
   // 检查登录状态
@@ -419,6 +389,7 @@ function App() {
         />
       ) : (
         <AppContainer>
+          <GameBackground />
           <GameLayout>
             <TopBar>
               <GameInfo />
@@ -435,17 +406,19 @@ function App() {
             </MainArea>
 
             <BottomArea>
-              <HandCardsSection>
+              <HandCardsArea>
                 <HandCardsLabel>您的手牌</HandCardsLabel>
-                <HandCardsWrapper>
+                <HandCardsList>
                   <CardContent />
-                </HandCardsWrapper>
-              </HandCardsSection>
-              <ControlsSection>
+                </HandCardsList>
+              </HandCardsArea>
+              <ControlsArea>
                 <GameControls />
-              </ControlsSection>
+              </ControlsArea>
             </BottomArea>
           </GameLayout>
+          <CardEffectDisplay />
+          <WinnerOverlayContent />
         </AppContainer>
       )}
     </GameProvider>
@@ -505,5 +478,52 @@ const PlaceholderText = styled.div`
   text-align: center;
   width: 100%;
 `;
+
+// Winner overlay content - uses useGame hook
+const WinnerOverlayContent = () => {
+  const { state } = useGame();
+
+  if (state.gameState !== 'finished' || !state.winner) {
+    return null;
+  }
+
+  const isLandlord = state.landlordId === state.winner.id;
+  const isHost = state.players?.some(p => p.id === state.myPlayerId && p.isHost);
+
+  return (
+    <WinnerDisplay
+      winner={state.winner}
+      isLandlord={isLandlord}
+      isHost={isHost}
+      onNextRound={() => {
+        // Dispatch to reset game state
+        ConnectionManager.startNextRound();
+      }}
+    />
+  );
+};
+
+// Card type effect display component
+const CardEffectDisplay = () => {
+  const { state } = useGame();
+
+  if (!state.currentEffect) {
+    return null;
+  }
+
+  const effect = state.currentEffect;
+  const isJoker = effect.type === 'JOKER_BOMB';
+  const effectName = CARD_TYPE_NAMES[effect.type] || effect.type;
+
+  return (
+    <EffectContainer>
+      <BombEffect $isJoker={isJoker}>
+        <EffectLabel $type={effect.type} $isJoker={isJoker}>
+          {effectName}
+        </EffectLabel>
+      </BombEffect>
+    </EffectContainer>
+  );
+};
 
 export default App;
