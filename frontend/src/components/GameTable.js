@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import Card from './Card';
 import { useGame } from '../contexts/GameContext';
-import playerAvatar from '../../ava.jpg';
+import playerAvatar from '../assets/ava.jpg';
 
 const TableContainer = styled.div`
   flex: 1;
