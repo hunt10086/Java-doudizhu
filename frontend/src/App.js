@@ -503,8 +503,10 @@ const WinnerOverlayContent = () => {
   }
 
   const isLandlord = state.landlordId === state.winner.id;
-  const isHost = state.players?.some(p => p.id === state.myPlayerId && p.isHost);
-  console.log('isHost calculation:', { myPlayerId: state.myPlayerId, players: state.players, isHost });
+  // Use ConnectionManager to get current player ID for isHost check
+  const currentPlayerId = ConnectionManager.getPlayerId();
+  const isHost = state.players?.some(p => p.id === currentPlayerId && p.isHost);
+  console.log('isHost calculation:', { currentPlayerId, players: state.players, isHost });
 
   const handleNextRound = () => {
     alert('Next round clicked!'); // Force alert
