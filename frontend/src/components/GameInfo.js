@@ -14,12 +14,31 @@ const InfoContainer = styled.div`
   border: 1px solid rgba(255, 255, 255, 0.2);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   color: white;
+  flex-shrink: 0;
+
+  @media (max-width: 768px) {
+    padding: 10px;
+    border-radius: 8px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    padding: 5px 10px;
+    border-radius: 6px;
+  }
 `;
 
 const GameStatus = styled.div`
   display: flex;
   align-items: center;
   gap: 15px;
+
+  @media (max-width: 768px) {
+    gap: 10px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    gap: 6px;
+  }
 `;
 
 const StatusItem = styled.div`
@@ -31,11 +50,27 @@ const StatusItem = styled.div`
 const StatusValue = styled.div`
   font-size: 24px;
   font-weight: bold;
+
+  @media (max-width: 768px) {
+    font-size: 18px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    font-size: 14px;
+  }
 `;
 
 const StatusLabel = styled.div`
   font-size: 12px;
   opacity: 0.8;
+
+  @media (max-width: 768px) {
+    font-size: 10px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    font-size: 8px;
+  }
 `;
 
 const GameInfo = () => {

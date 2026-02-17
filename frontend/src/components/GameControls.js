@@ -11,6 +11,25 @@ const ControlsContainer = styled.div`
   border-radius: 12px;
   border: 1px solid rgba(255,255,255,0.1);
   backdrop-filter: blur(10px);
+
+  @media (max-width: 768px) {
+    gap: 6px;
+    padding: 8px 12px;
+    border-radius: 10px;
+  }
+
+  @media (max-width: 480px) {
+    gap: 4px;
+    padding: 6px 8px;
+    border-radius: 8px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    gap: 4px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    flex-wrap: wrap;
+  }
 `;
 
 const ControlButton = styled.button`
@@ -26,6 +45,25 @@ const ControlButton = styled.button`
   pointer-events: ${props => props.$disabled ? 'none' : 'auto'};
   position: relative;
   overflow: hidden;
+
+  @media (max-width: 768px) {
+    padding: 6px 10px;
+    font-size: 11px;
+    border-radius: 6px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 5px 6px;
+    font-size: 10px;
+    border-radius: 5px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    padding: 4px 6px;
+    font-size: 9px;
+    border-radius: 4px;
+    min-width: 40px;
+  }
 
   &::before {
     content: '';
@@ -50,6 +88,12 @@ const ControlButton = styled.button`
 
   &:active:not(:disabled) {
     transform: translateY(0);
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    &:active:not(:disabled) {
+      transform: scale(0.96);
+    }
   }
 
   ${props => props.$variant === 'primary' && `
@@ -98,6 +142,16 @@ const WaitMessage = styled.div`
   align-items: center;
   justify-content: center;
   gap: 8px;
+
+  @media (max-width: 768px) {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
 `;
 
 const StatusMessage = styled.div`
@@ -116,6 +170,22 @@ const StatusMessage = styled.div`
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
 
+  @media (max-width: 768px) {
+    top: 50px;
+    left: 5px;
+    padding: 6px 10px;
+    font-size: 10px;
+    border-radius: 4px;
+  }
+
+  @media (max-width: 480px) {
+    top: 45px;
+    left: 5px;
+    padding: 4px 8px;
+    font-size: 9px;
+    border-radius: 3px;
+  }
+
   &::before {
     content: '';
     width: 6px;
@@ -123,6 +193,16 @@ const StatusMessage = styled.div`
     border-radius: 50%;
     background: #f39c12;
     animation: pulse 1.5s ease-in-out infinite;
+
+    @media (max-width: 768px) {
+      width: 5px;
+      height: 5px;
+    }
+
+    @media (max-width: 480px) {
+      width: 4px;
+      height: 4px;
+    }
   }
 
   @keyframes pulse {

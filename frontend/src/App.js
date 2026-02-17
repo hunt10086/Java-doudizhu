@@ -9,6 +9,7 @@ import ConnectionManager from './services/ConnectionManager';
 import { GameProvider, useGame } from './contexts/GameContext';
 import RoomManager from './components/RoomManager';
 import Auth from './components/Auth';
+import OrientationLock from './components/OrientationLock';
 import axios from './utils/axiosConfig';
 import WinnerDisplay from './components/WinnerDisplay';
 import {
@@ -43,6 +44,18 @@ const GlobalStyle = createGlobalStyle`
   body {
     font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     overflow: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 移动端触摸优化 */
+  @media (max-width: 768px) {
+    body {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
   }
 `;
 
@@ -80,6 +93,16 @@ const GameLayout = styled.div`
   gap: 10px;
   position: relative;
   z-index: 1;
+
+  @media (max-width: 768px) {
+    padding: 6px;
+    gap: 6px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    padding: 4px;
+    gap: 4px;
+  }
 `;
 
 // Top bar with game info
@@ -88,6 +111,10 @@ const TopBar = styled.div`
   justify-content: center;
   align-items: center;
   flex-shrink: 0;
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    height: 25px;
+  }
 `;
 
 // Main game area - flex to take remaining space
@@ -97,6 +124,16 @@ const MainArea = styled.div`
   gap: 10px;
   min-height: 0;
   overflow: hidden;
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    flex: 0.8;
+    gap: 4px;
+  }
+
+  @media (max-width: 480px) and (orientation: landscape) {
+    flex: 0.7;
+    min-width: 35%;
+  }
 `;
 
 // Left side - Game table
@@ -106,6 +143,10 @@ const GameArea = styled.div`
   flex-direction: column;
   min-width: 0;
   animation: ${fadeIn} 0.5s ease-out;
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    min-height: 0;
+  }
 `;
 
 // Right side - Info panel
@@ -115,6 +156,14 @@ const SidePanel = styled.div`
   flex-direction: column;
   gap: 10px;
   flex-shrink: 0;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    display: none;
+  }
 `;
 
 // Bottom area - Hand cards and controls
@@ -124,6 +173,23 @@ const BottomArea = styled.div`
   gap: 10px;
   flex-shrink: 0;
   animation: ${fadeIn} 0.6s ease-out;
+  min-height: 0;
+  overflow: hidden;
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    flex: 1;
+    min-width: 65%;
+    max-width: 75%;
+    gap: 3px;
+    min-height: 100px;
+  }
+
+  @media (max-width: 480px) and (orientation: landscape) {
+    flex: 1;
+    min-width: 70%;
+    gap: 2px;
+    min-height: 90px;
+  }
 `;
 
 // Card component styled for hand
@@ -437,6 +503,7 @@ function App() {
   return (
     <GameProvider initialState={initialGameState}>
       <GlobalStyle />
+      <OrientationLock />
       <MessageHandler />
       {loading ? (
         <LoadingContainer>

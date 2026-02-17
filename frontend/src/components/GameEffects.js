@@ -554,6 +554,28 @@ export const HandCardsArea = styled.div`
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  min-height: 0;
+  overflow: hidden;
+
+  @media (max-width: 768px) {
+    padding: 10px 12px;
+    border-radius: 14px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 8px 8px;
+    border-radius: 10px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    padding: 4px 6px;
+    border-radius: 6px;
+  }
+
+  @media (max-width: 480px) and (orientation: landscape) {
+    padding: 3px 4px;
+    border-radius: 4px;
+  }
 `;
 
 export const HandCardsLabel = styled.div`
@@ -566,6 +588,26 @@ export const HandCardsLabel = styled.div`
   align-items: center;
   gap: 10px;
 
+  @media (max-width: 768px) {
+    font-size: 10px;
+    margin-bottom: 6px;
+    letter-spacing: 2px;
+    gap: 6px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 9px;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    font-size: 6px;
+    margin-bottom: 2px;
+    letter-spacing: 0px;
+    gap: 2px;
+  }
+
   &::before, &::after {
     content: '';
     flex: 1;
@@ -577,8 +619,21 @@ export const HandCardsLabel = styled.div`
 export const HandCardsList = styled.div`
   display: flex;
   gap: 3px;
-  overflow-x: auto;
   padding: 5px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  min-height: 0;
+
+  @media (max-width: 768px) {
+    gap: 2px;
+    padding: 3px 0;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    gap: 1px;
+    padding: 2px 0;
+  }
 
   &::-webkit-scrollbar {
     height: 4px;
@@ -603,6 +658,30 @@ export const ControlsArea = styled.div`
   border: 2px solid rgba(255, 255, 255, 0.15);
   backdrop-filter: blur(20px);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+
+  @media (max-width: 768px) {
+    gap: 8px;
+    padding: 10px 15px;
+    border-radius: 14px;
+  }
+
+  @media (max-width: 480px) {
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 10px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    gap: 3px;
+    padding: 4px 6px;
+    border-radius: 6px;
+  }
+
+  @media (max-width: 480px) and (orientation: landscape) {
+    gap: 3px;
+    padding: 4px 6px;
+    border-radius: 6px;
+  }
 `;
 
 export const ActionButton = styled.button`

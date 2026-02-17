@@ -14,6 +14,11 @@ const ChatContainer = styled.div`
   overflow: hidden;
   flex: 1;
   min-height: 300px;
+
+  @media (max-width: 768px) {
+    min-height: 200px;
+    border-radius: 8px;
+  }
 `;
 
 const ChatHeader = styled.div`
@@ -22,6 +27,11 @@ const ChatHeader = styled.div`
   color: white;
   font-weight: bold;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+
+  @media (max-width: 768px) {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
 `;
 
 const MessagesContainer = styled.div`
@@ -31,6 +41,11 @@ const MessagesContainer = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
+
+  @media (max-width: 768px) {
+    padding: 8px;
+    gap: 6px;
+  }
 `;
 
 const MessageBubble = styled.div`
@@ -39,6 +54,12 @@ const MessageBubble = styled.div`
   border-radius: 18px;
   font-size: 14px;
   line-height: 1.4;
+
+  @media (max-width: 768px) {
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 14px;
+  }
 
   ${props => props.$isOwn ? `
     background: #3498db;
@@ -57,6 +78,10 @@ const MessageInfo = styled.div`
   font-size: 11px;
   opacity: 0.7;
   margin-bottom: 2px;
+
+  @media (max-width: 768px) {
+    font-size: 10px;
+  }
 `;
 
 const InputContainer = styled.div`
@@ -64,6 +89,10 @@ const InputContainer = styled.div`
   padding: 10px;
   background: rgba(0, 0, 0, 0.2);
   border-top: 1px solid rgba(255, 255, 255, 0.2);
+
+  @media (max-width: 768px) {
+    padding: 8px;
+  }
 `;
 
 const MessageInput = styled.input`
@@ -75,6 +104,12 @@ const MessageInput = styled.input`
   color: white;
   font-size: 14px;
   outline: none;
+
+  @media (max-width: 768px) {
+    padding: 8px 12px;
+    font-size: 13px;
+    border-radius: 16px;
+  }
 
   &::placeholder {
     color: rgba(255, 255, 255, 0.5);
@@ -95,6 +130,13 @@ const SendButton = styled.button`
   align-items: center;
   transition: all 0.2s ease;
 
+  @media (max-width: 768px) {
+    width: 34px;
+    height: 34px;
+    margin-left: 6px;
+    border-radius: 50%;
+  }
+
   &:hover {
     background: #27ae60;
     transform: scale(1.05);
@@ -102,6 +144,12 @@ const SendButton = styled.button`
 
   &:active {
     transform: scale(0.95);
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    &:active {
+      transform: scale(0.92);
+    }
   }
 `;
 

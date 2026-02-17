@@ -11,6 +11,26 @@ const TableContainer = styled.div`
   align-items: center;
   padding: 20px 40px;
   min-height: 300px;
+
+  @media (max-width: 768px) {
+    padding: 10px 15px;
+    min-height: 200px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 8px 10px;
+    min-height: 150px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    padding: 5px 15px;
+    min-height: 100px;
+  }
+
+  @media (max-width: 480px) and (orientation: landscape) {
+    padding: 3px 8px;
+    min-height: 80px;
+  }
 `;
 
 const PlayerSide = styled.div`
@@ -19,6 +39,16 @@ const PlayerSide = styled.div`
   align-items: center;
   gap: 10px;
   width: 150px;
+
+  @media (max-width: 768px) {
+    width: 80px;
+    gap: 5px;
+  }
+
+  @media (max-width: 480px) {
+    width: 60px;
+    gap: 3px;
+  }
 `;
 
 const PlayerCard = styled.div`
@@ -32,6 +62,18 @@ const PlayerCard = styled.div`
   border: 1px solid rgba(255,255,255,0.2);
   box-shadow: 0 4px 15px rgba(0,0,0,0.2);
   backdrop-filter: blur(5px);
+
+  @media (max-width: 768px) {
+    padding: 5px;
+    gap: 4px;
+    border-radius: 8px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 3px;
+    gap: 2px;
+    border-radius: 6px;
+  }
 `;
 
 const PlayerAvatar = styled.img`
@@ -41,6 +83,17 @@ const PlayerAvatar = styled.img`
   border: 2px solid ${props => props.$isCurrent ? '#4ecdc4' : 'rgba(255,255,255,0.3)'};
   box-shadow: ${props => props.$isCurrent ? '0 0 15px rgba(78,205,196,0.5)' : '0 2px 8px rgba(0,0,0,0.3)'};
   object-fit: cover;
+
+  @media (max-width: 768px) {
+    width: 40px;
+    height: 40px;
+  }
+
+  @media (max-width: 480px) {
+    width: 30px;
+    height: 30px;
+    border-width: 1px;
+  }
 `;
 
 const PlayerName = styled.div`
@@ -49,6 +102,18 @@ const PlayerName = styled.div`
   color: ${props => props.$isCurrent ? '#4ecdc4' : 'rgba(255,255,255,0.9)'};
   text-shadow: ${props => props.$isCurrent ? '0 0 10px #4ecdc4' : '0 1px 3px rgba(0,0,0,0.5)'};
   transition: all 0.3s ease;
+
+  @media (max-width: 768px) {
+    font-size: 11px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 9px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 55px;
+  }
 `;
 
 const PlayerCards = styled.div`
@@ -57,11 +122,23 @@ const PlayerCards = styled.div`
   justify-content: center;
   gap: 2px;
   min-height: 80px;
+
+  @media (max-width: 768px) {
+    min-height: 50px;
+  }
 `;
 
 const CardCount = styled.div`
   font-size: 12px;
   color: rgba(255,255,255,0.5);
+
+  @media (max-width: 768px) {
+    font-size: 10px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 8px;
+  }
 `;
 
 const CenterArea = styled.div`
@@ -72,6 +149,22 @@ const CenterArea = styled.div`
   align-items: center;
   gap: 20px;
   padding: 0 40px;
+  min-height: 0;
+
+  @media (max-width: 768px) {
+    padding: 0 15px;
+    gap: 10px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 0 8px;
+    gap: 6px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    padding: 0 10px;
+    gap: 5px;
+  }
 `;
 
 const PlayedCardsContainer = styled.div`
@@ -85,17 +178,60 @@ const PlayedCardsContainer = styled.div`
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   min-width: 300px;
+
+  @media (max-width: 768px) {
+    min-height: 60px;
+    padding: 10px;
+    min-width: 200px;
+    border-radius: 10px;
+  }
+
+  @media (max-width: 480px) {
+    min-height: 40px;
+    padding: 6px;
+    min-width: 150px;
+    border-radius: 8px;
+    gap: 2px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    min-height: 40px;
+    padding: 6px;
+    min-width: 120px;
+    border-radius: 6px;
+    gap: 2px;
+  }
 `;
 
 const StatusText = styled.div`
   font-size: 16px;
   color: rgba(255, 255, 255, 0.5);
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    font-size: 10px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 10px;
+  }
 `;
 
 const LandlordBadge = styled.div`
   font-size: 12px;
   color: #ff6b6b;
   font-weight: bold;
+
+  @media (max-width: 768px) {
+    font-size: 9px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 7px;
+  }
 `;
 
 const LandlordCardsContainer = styled.div`
@@ -109,6 +245,25 @@ const LandlordCardsContainer = styled.div`
   border: 2px solid ${props => props.$isLandlord ? 'rgba(255, 107, 107, 0.6)' : 'rgba(255, 255, 255, 0.15)'};
   box-shadow: ${props => props.$isLandlord ? '0 0 20px rgba(255, 107, 107, 0.3)' : 'none'};
   transition: all 0.3s ease;
+  flex-shrink: 0;
+
+  @media (max-width: 768px) {
+    padding: 8px 12px;
+    gap: 4px;
+    border-radius: 10px;
+  }
+
+  @media (max-width: 480px) {
+    padding: 5px 8px;
+    gap: 2px;
+    border-radius: 8px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    padding: 8px 15px;
+    gap: 3px;
+    border-radius: 8px;
+  }
 `;
 
 const LandlordCardsLabel = styled.div`
@@ -116,16 +271,53 @@ const LandlordCardsLabel = styled.div`
   color: ${props => props.$isLandlord ? '#ff6b6b' : 'rgba(255, 255, 255, 0.7)'};
   font-weight: ${props => props.$isLandlord ? 'bold' : 'normal'};
   text-shadow: ${props => props.$isLandlord ? '0 0 10px rgba(255, 107, 107, 0.5)' : 'none'};
+  white-space: nowrap;
+
+  @media (max-width: 768px) {
+    font-size: 10px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 8px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    font-size: 7px;
+  }
 `;
 
 const LandlordCardsList = styled.div`
   display: flex;
   gap: 8px;
+
+  @media (max-width: 768px) {
+    gap: 4px;
+  }
+
+  @media (max-width: 480px) {
+    gap: 2px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    gap: 2px;
+  }
 `;
 
 const SmallCardWrapper = styled.div`
   transform: scale(0.7);
   transform-origin: center;
+
+  @media (max-width: 768px) {
+    transform: scale(0.6);
+  }
+
+  @media (max-width: 480px) {
+    transform: scale(0.5);
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    transform: scale(0.9);
+  }
 `;
 
 const GameTable = () => {
