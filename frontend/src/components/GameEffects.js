@@ -615,3 +615,84 @@ export const generateConfetti = (count = 50) => {
     rotation: Math.random() * 360
   }));
 };
+
+// Toast notification animations
+const toastSlideIn = keyframes`
+  0% {
+    transform: translateX(-50%) translateY(-100px);
+    opacity: 0;
+  }
+  15% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  85% {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) translateY(-100px);
+    opacity: 0;
+  }
+`;
+
+const toastPulse = keyframes`
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(78, 205, 196, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(78, 205, 196, 0);
+  }
+`;
+
+export const ToastContainer = styled.div`
+  position: fixed;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  pointer-events: none;
+`;
+
+export const Toast = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 24px;
+  background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+  border-radius: 16px;
+  border: 2px solid ${props => {
+    switch(props.$type) {
+      case 'success': return '#4ecdc4';
+      case 'error': return '#ff6b6b';
+      case 'info': return '#45b7d1';
+      default: return '#4ecdc4';
+    }
+  }};
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.4),
+    0 0 20px ${props => {
+      switch(props.$type) {
+        case 'success': return 'rgba(78, 205, 196, 0.3)';
+        case 'error': return 'rgba(255, 107, 107, 0.3)';
+        case 'info': return 'rgba(69, 183, 209, 0.3)';
+        default: return 'rgba(78, 205, 196, 0.3)';
+      }
+    }};
+  animation: ${toastSlideIn} 3s ease-in-out forwards;
+  backdrop-filter: blur(10px);
+`;
+
+export const ToastIcon = styled.div`
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+export const ToastMessage = styled.div`
+  color: white;
+  font-size: 16px;
+  font-weight: 500;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+`;

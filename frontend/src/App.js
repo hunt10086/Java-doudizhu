@@ -20,7 +20,11 @@ import {
   EffectContainer,
   BombEffect,
   EffectLabel,
-  CARD_TYPE_NAMES
+  CARD_TYPE_NAMES,
+  ToastContainer,
+  Toast,
+  ToastIcon,
+  ToastMessage
 } from './components/GameEffects';
 import { CardUtils, CardType } from './utils/gameLogic';
 
@@ -337,6 +341,13 @@ function App() {
   const [showRoomManager, setShowRoomManager] = useState(true);
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+
+  // Show toast notification
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const initialGameState = {
     players: [],
@@ -428,7 +439,15 @@ function App() {
             </BottomArea>
           </GameLayout>
           <CardEffectDisplay />
-          <WinnerOverlayContent />
+          <WinnerOverlayContent showToast={showToast} />
+          {toast && (
+            <ToastContainer>
+              <Toast $type={toast.type}>
+                <ToastIcon>{toast.type === 'success' ? '✓' : toast.type === 'error' ? '✗' : 'ℹ'}</ToastIcon>
+                <ToastMessage>{toast.message}</ToastMessage>
+              </Toast>
+            </ToastContainer>
+          )}
         </AppContainer>
       )}
     </GameProvider>
@@ -490,7 +509,7 @@ const PlaceholderText = styled.div`
 `;
 
 // Winner overlay content - uses useGame hook
-const WinnerOverlayContent = () => {
+const WinnerOverlayContent = ({ showToast }) => {
   const { state } = useGame();
 
   window.WINNER_DEBUG = state; // Debug: expose state to window
@@ -509,9 +528,9 @@ const WinnerOverlayContent = () => {
   console.log('isHost calculation:', { currentPlayerId, players: state.players, isHost });
 
   const handleNextRound = () => {
-    alert('Next round clicked!'); // Force alert
     const gameId = ConnectionManager.getGameId();
     console.log('Next round clicked, gameId:', gameId, 'playerId:', ConnectionManager.getPlayerId());
+    showToast('正在发起下一局...', 'info');
     ConnectionManager.startNextRound();
   };
 
