@@ -268,10 +268,13 @@ const MessageHandler = ({ onGameStart }) => {
             }
             if (playData.playerWon) {
               // Find the winner player info
+              console.log('Player won, looking for player:', playData.playerId, 'in players:', state.players);
               const winnerPlayer = state.players?.find(p => p.id === playData.playerId);
-              dispatch({ type: 'SET_WINNER', payload: winnerPlayer || { id: playData.playerId } });
+              console.log('Found winnerPlayer:', winnerPlayer);
+              const winnerPayload = winnerPlayer ? { ...winnerPlayer } : { id: playData.playerId, name: '未知玩家' };
+              dispatch({ type: 'SET_WINNER', payload: winnerPayload });
               dispatch({ type: 'SET_GAME_STATE', payload: 'finished' });
-              console.log('Player won:', playData.playerId);
+              console.log('Player won:', playData.playerId, 'winnerPayload:', winnerPayload);
             }
           }
           break;
@@ -483,12 +486,16 @@ const PlaceholderText = styled.div`
 const WinnerOverlayContent = () => {
   const { state } = useGame();
 
+  console.log('WinnerOverlayContent render, gameState:', state.gameState, 'winner:', state.winner, 'players:', state.players, 'myPlayerId:', state.myPlayerId);
+
   if (state.gameState !== 'finished' || !state.winner) {
+    console.log('WinnerOverlayContent: not rendering because gameState:', state.gameState, 'winner:', state.winner);
     return null;
   }
 
   const isLandlord = state.landlordId === state.winner.id;
   const isHost = state.players?.some(p => p.id === state.myPlayerId && p.isHost);
+  console.log('isHost calculation:', { myPlayerId: state.myPlayerId, players: state.players, isHost });
 
   const handleNextRound = () => {
     const gameId = ConnectionManager.getGameId();
