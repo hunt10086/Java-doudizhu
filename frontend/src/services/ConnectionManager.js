@@ -331,6 +331,10 @@ class ConnectionManager {
   getPlayerId() {
     return this.playerId;
   }
+
+  getGameId() {
+    return this.gameId;
+  }
 }
 
 // Singleton instance

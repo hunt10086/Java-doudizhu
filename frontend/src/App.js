@@ -490,15 +490,18 @@ const WinnerOverlayContent = () => {
   const isLandlord = state.landlordId === state.winner.id;
   const isHost = state.players?.some(p => p.id === state.myPlayerId && p.isHost);
 
+  const handleNextRound = () => {
+    const gameId = ConnectionManager.getGameId();
+    console.log('Next round clicked, gameId:', gameId, 'playerId:', ConnectionManager.getPlayerId());
+    ConnectionManager.startNextRound();
+  };
+
   return (
     <WinnerDisplay
       winner={state.winner}
       isLandlord={isLandlord}
       isHost={isHost}
-      onNextRound={() => {
-        // Dispatch to reset game state
-        ConnectionManager.startNextRound();
-      }}
+      onNextRound={handleNextRound}
     />
   );
 };

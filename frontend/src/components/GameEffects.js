@@ -151,14 +151,14 @@ export const ComboCards = styled.div`
 // Winner announcement
 const winnerSlide = keyframes`
   0% {
-    transform: translate(-50%, -50%) scale(0);
+    transform: scale(0);
     opacity: 0;
   }
   50% {
-    transform: translate(-50%, -50%) scale(1.2);
+    transform: scale(1.1);
   }
   100% {
-    transform: translate(-50%, -50%) scale(1);
+    transform: scale(1);
     opacity: 1;
   }
 `;
@@ -185,7 +185,7 @@ export const WinnerOverlay = styled.div`
   justify-content: center;
   align-items: center;
   z-index: 1000;
-  animation: ${winnerSlide} 0.8s ease-out;
+  animation: ${winnerSlide} 0.5s ease-out;
 `;
 
 export const WinnerBox = styled.div`

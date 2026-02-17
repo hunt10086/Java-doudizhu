@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(mvn spring-boot:run:*)",
+      "Bash(mvn clean compile:*)",
+      "Bash(java -version:*)",
+      "Bash(find:*)",
+      "Bash(npm run build)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(node mock-server.js:*)",
+      "Bash(findstr:*)",
+      "Bash(curl:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(node:*)",
+      "Bash(mvn:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(where:*)"
+    ]
+  }
+}
