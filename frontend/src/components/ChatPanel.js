@@ -126,34 +126,55 @@ const ChatPanel = () => {
     // Subscribe to chat topic
     const handleChatMessage = (data) => {
       console.log('Chat message received:', data);
+      console.log('data.data type:', typeof data.data, 'value:', data.data);
       if (data.type === 'CHAT_MESSAGE') {
         const isOwn = data.playerId === connectionManager.getPlayerId();
-        // data.data can be either an object or a string
-        let senderName = '未知玩家';
-        let text = '';
-        let messageId = data.data?.messageId || Date.now();
 
         // Skip if this is our own message that we just sent (already added locally)
-        if (isOwn && pendingMessageId === messageId) {
-          console.log('Skipping duplicate own message');
+        // Check by messageId if available (convert to string for comparison)
+        const messageId = data.data?.messageId ? String(data.data.messageId) : null;
+        const pendingId = pendingMessageId ? String(pendingMessageId) : null;
+        if (isOwn && messageId && pendingId && messageId === pendingId) {
+          console.log('Skipping duplicate own message, messageId:', messageId);
           setPendingMessageId(null);
           return;
         }
 
-        if (typeof data.data === 'object' && data.data !== null) {
-          senderName = isOwn ? '我' : (data.data.senderName || '未知玩家');
-          text = data.data.text || '';
-          messageId = data.data.messageId || messageId;
-        } else if (typeof data.data === 'string') {
-          // If data.data is a string, use it as text and get senderName from player lookup
-          text = data.data;
-          if (!isOwn) {
-            senderName = data.playerId || '未知玩家';
+        // Extract sender name and text from the data
+        let senderName = '未知玩家';
+        let text = '';
+        let finalMessageId = messageId || Date.now();
+
+        // Handle both object and string data formats
+        let rawText = '';
+        if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+          // It's an object - extract text
+          // Note: backend may nest text in data.data.text.text or data.data.text
+          const textField = data.data.text;
+          if (typeof textField === 'string') {
+            rawText = textField;
+          } else if (textField && typeof textField === 'object' && textField.text) {
+            // Backend nested the text: { text: { text: "1", messageId: xxx } }
+            rawText = textField.text;
           }
+          senderName = isOwn ? '我' : (data.data.senderName || data.playerId || '未知玩家');
+          finalMessageId = data.data.messageId || finalMessageId;
+        } else if (typeof data.data === 'string') {
+          rawText = data.data;
+          senderName = isOwn ? '我' : (data.playerId || '未知玩家');
+        }
+
+        // Ensure text is a string
+        text = String(rawText || '');
+
+        // Skip if text is empty or not a valid string
+        if (!text || text === '[object Object]') {
+          console.log('Skipping invalid message:', data.data);
+          return;
         }
 
         const newMessage = {
-          id: messageId,
+          id: finalMessageId,
           sender: senderName,
           text: text,
           timestamp: new Date().toLocaleTimeString(),

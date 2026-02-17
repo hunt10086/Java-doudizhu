@@ -98,6 +98,36 @@ const LandlordBadge = styled.div`
   font-weight: bold;
 `;
 
+const LandlordCardsContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 15px 25px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  border: 2px solid ${props => props.$isLandlord ? 'rgba(255, 107, 107, 0.6)' : 'rgba(255, 255, 255, 0.15)'};
+  box-shadow: ${props => props.$isLandlord ? '0 0 20px rgba(255, 107, 107, 0.3)' : 'none'};
+  transition: all 0.3s ease;
+`;
+
+const LandlordCardsLabel = styled.div`
+  font-size: 13px;
+  color: ${props => props.$isLandlord ? '#ff6b6b' : 'rgba(255, 255, 255, 0.7)'};
+  font-weight: ${props => props.$isLandlord ? 'bold' : 'normal'};
+  text-shadow: ${props => props.$isLandlord ? '0 0 10px rgba(255, 107, 107, 0.5)' : 'none'};
+`;
+
+const LandlordCardsList = styled.div`
+  display: flex;
+  gap: 8px;
+`;
+
+const SmallCardWrapper = styled.div`
+  transform: scale(0.7);
+  transform-origin: center;
+`;
+
 const GameTable = () => {
   const { state } = useGame();
   const [centerCards, setCenterCards] = useState([]);
@@ -187,6 +217,27 @@ const GameTable = () => {
             </StatusText>
           )}
         </PlayedCardsContainer>
+
+        {/* Landlord cards (底牌) - visible to all players */}
+        {state.landlordCards && state.landlordCards.length > 0 && (
+          <LandlordCardsContainer $isLandlord={isLandlord(state.myPlayerId)}>
+            <LandlordCardsLabel $isLandlord={isLandlord(state.myPlayerId)}>
+              {isLandlord(state.myPlayerId) ? '🎯 您的底牌' : '底牌'}
+            </LandlordCardsLabel>
+            <LandlordCardsList>
+              {state.landlordCards.map((card, index) => (
+                <SmallCardWrapper key={`landlord-${index}-${card.suit}-${card.rank}`}>
+                  <Card
+                    suit={card.suit}
+                    rank={card.rank}
+                    size="small"
+                    isFaceUp={true}
+                  />
+                </SmallCardWrapper>
+              ))}
+            </LandlordCardsList>
+          </LandlordCardsContainer>
+        )}
       </CenterArea>
 
       {/* Right player (下家) */}

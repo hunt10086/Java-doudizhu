@@ -24,7 +24,9 @@ import {
   ToastContainer,
   Toast,
   ToastIcon,
-  ToastMessage
+  ToastMessage,
+  ScreenShakeWrapper,
+  FlashOverlay
 } from './components/GameEffects';
 import { CardUtils, CardType } from './utils/gameLogic';
 
@@ -185,10 +187,15 @@ const MessageHandler = ({ onGameStart }) => {
 
         case 'CARDS_DEAL':
           console.log('CARDS_DEAL received, data:', data.data, 'currentPlayerId:', currentPlayerId);
-          // New format: data contains { targetPlayerId, cards }
+          // New format: data contains { targetPlayerId, cards, playerCardCounts? }
           if (data.data && data.data.targetPlayerId === currentPlayerId && data.data.cards) {
             console.log('Setting hand cards for player:', currentPlayerId, 'cards count:', data.data.cards.length);
             dispatch({ type: 'SET_HAND_CARDS', payload: data.data.cards });
+            // Also update player card counts if provided (for landlord card redistribution)
+            if (data.data.playerCardCounts) {
+              console.log('Updating player card counts:', data.data.playerCardCounts);
+              dispatch({ type: 'SET_PLAYER_CARD_COUNTS', payload: data.data.playerCardCounts });
+            }
           }
           // Also handle old format for backward compatibility
           if (data.playerId === currentPlayerId && data.data && Array.isArray(data.data)) {
@@ -213,6 +220,11 @@ const MessageHandler = ({ onGameStart }) => {
               dispatch({ type: 'SET_CURRENT_PLAYER', payload: { id: landlordData.landlordId } });
               // Landlord goes first, cannot pass
               dispatch({ type: 'SET_CAN_PASS', payload: false });
+              // Set landlord cards (visible to all players)
+              if (landlordData.landlordCards) {
+                dispatch({ type: 'SET_LANDLORD_CARDS', payload: landlordData.landlordCards });
+                console.log('Landlord cards:', landlordData.landlordCards);
+              }
               console.log('Landlord determined:', landlordData.landlordId);
             }
           } else {
@@ -256,6 +268,17 @@ const MessageHandler = ({ onGameStart }) => {
                     cardType.type === CardType.AIRPLANE)) {
                   console.log('Special card type detected:', cardType.type);
                   dispatch({ type: 'SET_CURRENT_EFFECT', payload: cardType });
+
+                  // Trigger screen shake for bombs and joker bombs
+                  if (cardType.type === CardType.BOMB || cardType.type === CardType.JOKER_BOMB) {
+                    const isJoker = cardType.type === CardType.JOKER_BOMB;
+                    dispatch({ type: 'SET_SCREEN_SHAKE', payload: { active: true, isJoker } });
+                    // Clear shake after animation
+                    setTimeout(() => {
+                      dispatch({ type: 'SET_SCREEN_SHAKE', payload: { active: false, isJoker: false } });
+                    }, isJoker ? 800 : 600);
+                  }
+
                   // Clear effect after 2 seconds
                   setTimeout(() => {
                     dispatch({ type: 'SET_CURRENT_EFFECT', payload: null });
@@ -313,6 +336,7 @@ const MessageHandler = ({ onGameStart }) => {
           dispatch({ type: 'SET_GAME_STATE', payload: 'bidding' });
           dispatch({ type: 'SET_CURRENT_CARDS', payload: [] });
           dispatch({ type: 'SET_LANDLORD', payload: null });
+          dispatch({ type: 'SET_LANDLORD_CARDS', payload: [] });
           dispatch({ type: 'CLEAR_SELECTED_CARDS' });
           dispatch({ type: 'SET_CAN_PASS', payload: true });
           break;
@@ -336,6 +360,22 @@ const MessageHandler = ({ onGameStart }) => {
   return null;
 };
 
+// Screen shake effect component - reads from GameContext
+const ScreenShakeEffect = () => {
+  const { state } = useGame();
+
+  if (!state.screenShake || !state.screenShake.active) {
+    return null;
+  }
+
+  return (
+    <>
+      <ScreenShakeWrapper $isJoker={state.screenShake.isJoker} />
+      <FlashOverlay $isJoker={state.screenShake.isJoker} />
+    </>
+  );
+};
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showRoomManager, setShowRoomManager] = useState(true);
@@ -355,6 +395,7 @@ function App() {
     currentCards: [],
     gameState: 'waiting',
     landlordId: null,
+    landlordCards: [],
     round: 1,
     scores: {},
     myPlayerId: null,
@@ -410,6 +451,7 @@ function App() {
         />
       ) : (
         <AppContainer>
+          <ScreenShakeEffect />
           <GameBackground />
           <GameLayout>
             <TopBar>

@@ -9,6 +9,7 @@ const initialState = {
   currentCards: [],
   gameState: 'waiting',
   landlordId: null,
+  landlordCards: [],  // The 3 landlord cards (底牌)
   round: 1,
   scores: {},
   myPlayerId: null,
@@ -17,7 +18,8 @@ const initialState = {
   playerCardCounts: {},  // Store card counts for all players
   canPass: true,  // Whether current player can pass (不要)
   winner: null,  // Winner of the game
-  currentEffect: null  // Current card type effect to display
+  currentEffect: null,  // Current card type effect to display
+  screenShake: { active: false, isJoker: false }  // Screen shake effect state
 };
 
 function gameReducer(state, action) {
@@ -31,7 +33,13 @@ function gameReducer(state, action) {
     case 'SET_GAME_STATE':
       return { ...state, gameState: action.payload };
     case 'SET_LANDLORD':
-      return { ...state, landlordId: action.payload };
+      // Update landlordId and also update isLandlord in players array
+      const newLandlordId = action.payload;
+      const updatedPlayers = state.players.map(player => ({
+        ...player,
+        isLandlord: player.id === newLandlordId
+      }));
+      return { ...state, landlordId: newLandlordId, players: updatedPlayers };
     case 'SET_CAN_PASS':
       return { ...state, canPass: action.payload };
     case 'SET_WINNER':
@@ -90,6 +98,12 @@ function gameReducer(state, action) {
     case 'SET_CURRENT_EFFECT':
       // Set current effect for special card type display
       return { ...state, currentEffect: action.payload };
+    case 'SET_SCREEN_SHAKE':
+      // Set screen shake effect for bombs and joker bombs
+      return { ...state, screenShake: action.payload };
+    case 'SET_LANDLORD_CARDS':
+      // Set landlord cards (底牌) for all players to see
+      return { ...state, landlordCards: action.payload };
     case 'ADD_PLAYER':
       // Add a new player to the players array
       return { ...state, players: [...(state.players || []), action.payload] };

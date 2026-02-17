@@ -724,6 +724,8 @@ public class GameService {
             // Notify players
             Map<String, Object> landlordData = new HashMap<>();
             landlordData.put("landlordId", gameState.getPlayers().get(0).getId());
+            // Send landlord cards to all players
+            landlordData.put("landlordCards", gameState.getLandlordCards());
             GameEvent landlordEvent = new GameEvent(
                 GameEvent.EventType.BID_RESPONSE,
                 broadcastGameId,
@@ -732,11 +734,18 @@ public class GameService {
             );
             messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, landlordEvent);
 
+            // Calculate player card counts for all players
+            Map<String, Integer> playerCardCounts = new HashMap<>();
+            for (Player p : gameState.getPlayers()) {
+                playerCardCounts.put(p.getId(), p.getHand() != null ? p.getHand().size() : 0);
+            }
+
             // Send updated hands
             for (Player player : gameState.getPlayers()) {
                 Map<String, Object> dealData = new HashMap<>();
                 dealData.put("targetPlayerId", player.getId());
                 dealData.put("cards", player.getHand());
+                dealData.put("playerCardCounts", playerCardCounts);
                 GameEvent dealEvent = new GameEvent(
                     GameEvent.EventType.CARDS_DEAL,
                     broadcastGameId,
@@ -923,9 +932,11 @@ public class GameService {
             messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, dealEvent);
         }
 
-        // Notify all players of landlord (without showing landlord cards)
+        // Notify all players of landlord (with landlord cards visible to all)
         Map<String, Object> landlordData = new HashMap<>();
         landlordData.put("landlordId", finalLandlordId);
+        // Send landlord cards to all players
+        landlordData.put("landlordCards", gameState.getLandlordCards());
 
         GameEvent landlordEvent = new GameEvent(
             GameEvent.EventType.BID_RESPONSE,

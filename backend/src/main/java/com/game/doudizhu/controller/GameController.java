@@ -291,10 +291,13 @@ public class GameController {
         if (data instanceof Map) {
             @SuppressWarnings("unchecked")
             Map<String, Object> dataMap = (Map<String, Object>) data;
-            chatData.put("text", dataMap.get("text"));
-            chatData.put("messageId", dataMap.get("messageId"));
+            // Extract text and messageId as strings/values, not objects
+            Object textObj = dataMap.get("text");
+            Object msgIdObj = dataMap.get("messageId");
+            chatData.put("text", textObj != null ? textObj.toString() : "");
+            chatData.put("messageId", msgIdObj != null ? msgIdObj.toString() : "");
         } else {
-            chatData.put("text", data);
+            chatData.put("text", data != null ? data.toString() : "");
         }
         chatData.put("senderName", senderName);
         chatData.put("playerId", playerId);

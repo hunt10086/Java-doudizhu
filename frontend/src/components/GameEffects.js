@@ -1,6 +1,132 @@
 // Card type effects and animations
 import styled, { keyframes, css } from 'styled-components';
 
+// Screen shake animation for bombs and joker bombs
+const screenShake = keyframes`
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  10% {
+    transform: translate(-10px, -5px) rotate(-1deg);
+  }
+  20% {
+    transform: translate(10px, 5px) rotate(1deg);
+  }
+  30% {
+    transform: translate(-8px, 3px) rotate(-0.5deg);
+  }
+  40% {
+    transform: translate(8px, -3px) rotate(0.5deg);
+  }
+  50% {
+    transform: translate(-5px, 5px) rotate(-0.3deg);
+  }
+  60% {
+    transform: translate(5px, -5px) rotate(0.3deg);
+  }
+  70% {
+    transform: translate(-3px, 2px) rotate(-0.2deg);
+  }
+  80% {
+    transform: translate(3px, -2px) rotate(0.2deg);
+  }
+  90% {
+    transform: translate(-1px, 1px) rotate(-0.1deg);
+  }
+`;
+
+// Intense shake for joker bomb
+const intenseShake = keyframes`
+  0%, 100% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+  5% {
+    transform: translate(-15px, -10px) rotate(-2deg) scale(1.02);
+  }
+  10% {
+    transform: translate(15px, 10px) rotate(2deg) scale(0.98);
+  }
+  15% {
+    transform: translate(-12px, 8px) rotate(-1.5deg) scale(1.01);
+  }
+  20% {
+    transform: translate(12px, -8px) rotate(1.5deg) scale(0.99);
+  }
+  25% {
+    transform: translate(-10px, 6px) rotate(-1deg) scale(1.02);
+  }
+  30% {
+    transform: translate(10px, -6px) rotate(1deg) scale(0.98);
+  }
+  35% {
+    transform: translate(-8px, 4px) rotate(-0.8deg) scale(1.01);
+  }
+  40% {
+    transform: translate(8px, -4px) rotate(0.8deg) scale(0.99);
+  }
+  45% {
+    transform: translate(-6px, 3px) rotate(-0.5deg) scale(1.01);
+  }
+  50% {
+    transform: translate(6px, -3px) rotate(0.5deg) scale(0.99);
+  }
+  55% {
+    transform: translate(-4px, 2px) rotate(-0.3deg) scale(1.005);
+  }
+  60% {
+    transform: translate(4px, -2px) rotate(0.3deg) scale(0.995);
+  }
+  65% {
+    transform: translate(-3px, 1px) rotate(-0.2deg);
+  }
+  70% {
+    transform: translate(3px, -1px) rotate(0.2deg);
+  }
+  75% {
+    transform: translate(-2px, 1px) rotate(-0.1deg);
+  }
+  80% {
+    transform: translate(2px, -1px) rotate(0.1deg);
+  }
+  85% {
+    transform: translate(-1px, 0px);
+  }
+  90% {
+    transform: translate(1px, 0px);
+  }
+`;
+
+// Flash effect for bombs
+const bombFlash = keyframes`
+  0% {
+    background-color: rgba(255, 255, 255, 0);
+  }
+  50% {
+    background-color: rgba(255, 107, 107, 0.3);
+  }
+  100% {
+    background-color: rgba(255, 255, 255, 0);
+  }
+`;
+
+const jokerFlash = keyframes`
+  0% {
+    background-color: rgba(255, 255, 255, 0);
+  }
+  25% {
+    background-color: rgba(255, 0, 0, 0.3);
+  }
+  50% {
+    background-color: rgba(0, 255, 0, 0.3);
+  }
+  75% {
+    background-color: rgba(0, 0, 255, 0.3);
+  }
+  100% {
+    background-color: rgba(255, 255, 255, 0);
+  }
+`;
+
 // Card type names in Chinese
 export const CARD_TYPE_NAMES = {
   SINGLE: '单张',
@@ -695,4 +821,33 @@ export const ToastMessage = styled.div`
   font-size: 16px;
   font-weight: 500;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+`;
+
+// Screen shake wrapper component
+export const ScreenShakeWrapper = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 9999;
+
+  ${props => props.$isJoker ? css`
+    animation: ${intenseShake} 0.8s ease-out;
+  ` : css`
+    animation: ${screenShake} 0.6s ease-out;
+  `}
+`;
+
+// Flash overlay for bomb effect
+export const FlashOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 9998;
+  animation: ${props => props.$isJoker ? jokerFlash : bombFlash} 0.5s ease-out;
 `;
