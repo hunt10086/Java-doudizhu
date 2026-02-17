@@ -122,3 +122,34 @@ Open browser console (F12) to see debug logs:
 - `GameControls render:` - Shows current player, game state
 - `PLAY_CARDS event received:` - Card play events
 - `Received game event:` - All WebSocket events
+
+## Commit Message Format
+
+使用中文提交,格式如下:
+
+```
+<类型>: <标题>
+
+<正文>
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
+
+### 类型
+- `feat`: 新功能
+- `fix`: Bug修复
+- `optimize`: 优化(性能/体验等)
+- `refactor`: 重构
+- `style`: 样式调整
+
+### 示例
+```
+优化地主牌显示及游戏结算界面
+
+主要优化点:
+1. 地主牌(底牌)显示: 所有玩家可见三张底牌,地主视角显示红色高亮边框
+2. 修复默认地主问题: 三轮无人叫地主后正确显示20张牌(含底牌)
+3. 地主可见性修复: SET_LANDLORD reducer同时更新players数组的isLandlord属性
+
+Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
+```
