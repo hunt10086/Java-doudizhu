@@ -486,6 +486,8 @@ const PlaceholderText = styled.div`
 const WinnerOverlayContent = () => {
   const { state } = useGame();
 
+  window.WINNER_DEBUG = state; // Debug: expose state to window
+
   console.log('WinnerOverlayContent render, gameState:', state.gameState, 'winner:', state.winner, 'players:', state.players, 'myPlayerId:', state.myPlayerId);
 
   if (state.gameState !== 'finished' || !state.winner) {
@@ -498,6 +500,7 @@ const WinnerOverlayContent = () => {
   console.log('isHost calculation:', { myPlayerId: state.myPlayerId, players: state.players, isHost });
 
   const handleNextRound = () => {
+    alert('Next round clicked!'); // Force alert
     const gameId = ConnectionManager.getGameId();
     console.log('Next round clicked, gameId:', gameId, 'playerId:', ConnectionManager.getPlayerId());
     ConnectionManager.startNextRound();
