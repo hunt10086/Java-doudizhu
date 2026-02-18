@@ -12,7 +12,7 @@ import {
   generateConfetti
 } from './GameEffects';
 
-const WinnerDisplay = ({ winner, isLandlord, onNextRound, isHost, onClose }) => {
+const WinnerDisplay = ({ winner, isLandlord, onNextRound, isHost, onClose, onLeaveRoom }) => {
   const [confetti, setConfetti] = useState([]);
   const [showOverlay, setShowOverlay] = useState(false);
 
@@ -42,6 +42,14 @@ const WinnerDisplay = ({ winner, isLandlord, onNextRound, isHost, onClose }) => 
     e.stopPropagation();
     if (onClose) {
       onClose();
+    }
+  };
+
+  const handleLeaveRoom = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onLeaveRoom) {
+      onLeaveRoom();
     }
   };
 
@@ -84,6 +92,9 @@ const WinnerDisplay = ({ winner, isLandlord, onNextRound, isHost, onClose }) => 
           {!isHost && (
             <WaitText>等待房主开始下一局...</WaitText>
           )}
+          <LeaveRoomButton onClick={handleLeaveRoom}>
+            退出房间
+          </LeaveRoomButton>
         </WinnerBox>
       </WinnerOverlay>
     </>
@@ -163,6 +174,39 @@ const WaitText = styled.div`
   @media (max-width: 480px) {
     margin-top: 10px;
     font-size: 12px;
+  }
+`;
+
+const LeaveRoomButton = styled.button`
+  margin-top: 15px;
+  padding: 10px 30px;
+  font-size: 16px;
+  font-weight: bold;
+  color: white;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  border: none;
+  border-radius: 20px;
+  cursor: pointer;
+  pointer-events: all;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+  position: relative;
+  z-index: 1001;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(231, 76, 60, 0.6);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  @media (max-width: 480px) {
+    margin-top: 10px;
+    padding: 8px 20px;
+    font-size: 14px;
+    border-radius: 15px;
   }
 `;
 

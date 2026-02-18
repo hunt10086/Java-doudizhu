@@ -527,8 +527,9 @@ public class GameService {
 
         // Check if game is in progress (cannot leave while playing)
         if (gameState.getStatus() == GameState.Status.PLAYING ||
-            gameState.getStatus() == GameState.Status.BIDDING) {
-            // Cannot leave while game is in progress
+            gameState.getStatus() == GameState.Status.BIDDING ||
+            gameState.getStatus() == GameState.Status.DEALING) {
+            // Cannot leave while game is in progress - for normal leave requests
             return false;
         }
 
@@ -547,37 +548,18 @@ public class GameService {
         );
         messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, leaveEvent);
 
-        // If host left or no players left, destroy the game
-        if (isHost || gameState.getPlayers().isEmpty()) {
-            // Destroy the game
-            activeGames.remove(broadcastGameId);
+        // Any player leaving destroys the room
+        // Destroy the game
+        activeGames.remove(broadcastGameId);
 
-            // Broadcast game destroyed event
-            GameEvent destroyEvent = new GameEvent(
-                GameEvent.EventType.GAME_DESTROYED,
-                broadcastGameId,
-                null,
-                isHost ? "房主离开，房间已解散" : "房间已解散"
-            );
-            messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, destroyEvent);
-
-            return true;
-        }
-
-        // If the host left but there are still players, reassign host
-        if (isHost && !gameState.getPlayers().isEmpty()) {
-            Player newHost = gameState.getPlayers().get(0);
-            newHost.setHost(true);
-
-            // Broadcast new host info
-            GameEvent hostChangeEvent = new GameEvent(
-                GameEvent.EventType.GAME_START,
-                broadcastGameId,
-                newHost.getId(),
-                getBasicPlayerInfo(gameState.getPlayers())
-            );
-            messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, hostChangeEvent);
-        }
+        // Broadcast game destroyed event
+        GameEvent destroyEvent = new GameEvent(
+            GameEvent.EventType.GAME_DESTROYED,
+            broadcastGameId,
+            null,
+            "玩家离开，房间已解散"
+        );
+        messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, destroyEvent);
 
         return true;
     }
@@ -1485,29 +1467,6 @@ public class GameService {
      */
     private String generateGameId() {
         return "game_" + System.currentTimeMillis() + "_" + random.nextInt(10000);
-    }
-
-    /**
-     * Handle player disconnection
-     */
-    public void handleDisconnect(String gameId, String playerId) {
-        GameState gameState = activeGames.get(gameId);
-        if (gameState == null) {
-            return; // Game might already be finished
-        }
-
-        // Use actual gameId from gameState for broadcasting
-        String broadcastGameId = gameState.getGameId();
-
-        // Notify other players
-        GameEvent disconnectEvent = new GameEvent(
-            GameEvent.EventType.PLAYER_DISCONNECT,
-            broadcastGameId,
-            playerId,
-            null
-        );
-
-        messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, disconnectEvent);
     }
 
     /**

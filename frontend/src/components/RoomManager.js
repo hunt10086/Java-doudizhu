@@ -168,6 +168,27 @@ const SuccessMessage = styled.div`
   margin-top: 10px;
 `;
 
+const LeaveButton = styled.button`
+  padding: 10px 20px;
+  background: #e74c3c;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 15px;
+  pointer-events: all;
+  position: relative;
+  z-index: 10;
+
+  &:hover {
+    background: #c0392b;
+    transform: translateY(-2px);
+  }
+`;
+
 const RoomManager = ({ onGameStart, userInfo }) => {
   const { dispatch } = useGame();
   const [playerName, setPlayerName] = useState(userInfo?.nickname || userInfo?.username || '');
@@ -217,11 +238,6 @@ const RoomManager = ({ onGameStart, userInfo }) => {
         setError('无法连接到游戏服务器');
       }
     );
-
-    // Don't disconnect on unmount - the connection should persist for the game
-    // return () => {
-    //   connectionManager.disconnect();
-    // };
   }, [dispatch]);
 
   // Listen for game events
@@ -355,6 +371,42 @@ const RoomManager = ({ onGameStart, userInfo }) => {
         if (data.playerId === currentPlayerId && data.data && Array.isArray(data.data)) {
           dispatch({ type: 'SET_HAND_CARDS', payload: data.data });
         }
+      } else if (data.type === 'PLAYER_LEAVE') {
+        // 玩家离开房间
+        console.log('PLAYER_LEAVE event:', data);
+        const leavingPlayerId = data.playerId;
+        const leavingPlayerName = data.data;
+
+        // 从玩家列表中移除该玩家
+        setPlayers(prev => {
+          const newPlayers = prev.filter(p => p.id !== leavingPlayerId);
+          console.log('Player left, remaining players:', newPlayers);
+
+          // 如果不足3人，重置房间状态
+          if (newPlayers.length < 3) {
+            setRoomReady(false);
+          }
+
+          // 如果是自己离开，重置房间状态
+          if (leavingPlayerId === myPlayerId) {
+            resetRoomState();
+          }
+
+          return newPlayers;
+        });
+
+        setSuccess(`${leavingPlayerName} 离开了房间`);
+      } else if (data.type === 'GAME_DESTROYED') {
+        // 房间被解散（房主离开或所有玩家离开）
+        console.log('GAME_DESTROYED event:', data);
+        const message = data.data || '房间已解散';
+
+        // 显示消息
+        setError(message);
+        setTimeout(() => setError(''), 3000);
+
+        // 重置房间状态，回到初始界面
+        resetRoomState();
       }
     };
 
@@ -442,6 +494,26 @@ const RoomManager = ({ onGameStart, userInfo }) => {
     }
   };
 
+  // 重置房间状态
+  const resetRoomState = () => {
+    setCurrentRoomInfo(null);
+    setRoomId('');
+    setIsHost(false);
+    setPlayers([]);
+    setRoomReady(false);
+    connectionManager.setGameId(null);
+  };
+
+  // 退出房间
+  const handleLeaveRoom = () => {
+    const gameId = currentRoomInfo?.gameId || roomId;
+    if (gameId) {
+      connectionManager.leaveGame();
+    }
+    // 无论后端是否处理，都重置前端状态
+    resetRoomState();
+  };
+
   // Show room info if in a room
   if (currentRoomInfo || roomReady) {
     return (
@@ -487,6 +559,13 @@ const RoomManager = ({ onGameStart, userInfo }) => {
           {!isHost && !roomReady && (
             <SuccessMessage>等待房主邀请其他玩家...</SuccessMessage>
           )}
+
+          {/* 退出房间按钮 */}
+          <div style={{ textAlign: 'center' }}>
+            <LeaveButton onClick={handleLeaveRoom}>
+              退出房间
+            </LeaveButton>
+          </div>
 
           {error && <ErrorMessage>{error}</ErrorMessage>}
         </RoomBox>

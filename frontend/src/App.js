@@ -249,7 +249,7 @@ const HandCard = styled.div`
 `;
 
 // Message handler component
-const MessageHandler = ({ onGameStart }) => {
+const MessageHandler = ({ onGameStart, showToast }) => {
   const { state, dispatch } = useGame();
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -294,6 +294,25 @@ const MessageHandler = ({ onGameStart }) => {
 
             if (data.data.playerCardCounts) {
               dispatch({ type: 'SET_PLAYER_CARD_COUNTS', payload: data.data.playerCardCounts });
+            }
+
+            // Handle reconnection - restore game state
+            if (data.data.reconnected) {
+              if (data.data.landlordId) {
+                dispatch({ type: 'SET_LANDLORD', payload: data.data.landlordId });
+              }
+              if (data.data.landlordCards) {
+                dispatch({ type: 'SET_LANDLORD_CARDS', payload: data.data.landlordCards });
+              }
+              if (data.data.currentCards) {
+                dispatch({ type: 'SET_CURRENT_CARDS', payload: data.data.currentCards });
+              }
+              if (data.data.handCards) {
+                dispatch({ type: 'SET_HAND_CARDS', payload: data.data.handCards });
+              }
+              if (data.data.currentPlayerId) {
+                dispatch({ type: 'SET_CURRENT_PLAYER', payload: { id: data.data.currentPlayerId } });
+              }
             }
           }
           // Only show room manager when status is WAITING and there's no roomId
@@ -460,7 +479,20 @@ const MessageHandler = ({ onGameStart }) => {
           break;
 
         case 'PLAYER_DISCONNECT':
-          console.log('Player disconnected:', data.playerId);
+          console.log('Player disconnected:', data.playerId, data.data);
+          break;
+
+        case 'GAME_DESTROYED':
+          // 房间被解散（房主离开或所有玩家离开）
+          console.log('Game destroyed:', data.data);
+          // 显示提示并让用户返回房间等待界面
+          showToast(data.data || '房间已解散', 'error');
+          // 触发返回房间界面
+          onGameStart && onGameStart();
+          break;
+
+        case 'PLAYER_RECONNECT':
+          console.log('Player reconnected:', data.playerId, data.data);
           break;
 
         case 'TURN_START':
@@ -483,7 +515,7 @@ const MessageHandler = ({ onGameStart }) => {
     return () => {
       ConnectionManager.removeMessageListener(handleMessage);
     };
-  }, [dispatch, onGameStart]);
+  }, [dispatch, onGameStart, showToast]);
 
   return null;
 };
@@ -580,7 +612,7 @@ function App() {
     <GameProvider initialState={initialGameState}>
       <GlobalStyle />
       <OrientationLock />
-      <MessageHandler onGameStart={() => setShowRoomManager(true)} />
+      <MessageHandler onGameStart={() => setShowRoomManager(true)} showToast={showToast} />
       {loading ? (
         <LoadingContainer>
           <LoadingText>加载中...</LoadingText>
@@ -627,7 +659,7 @@ function App() {
               </ControlsArea>
             </BottomArea>
           </GameLayout>
-          <WinnerOverlayContent showToast={showToast} />
+          <WinnerOverlayContent showToast={showToast} onShowRoomManager={() => setShowRoomManager(true)} />
           {toast && (
             <ToastContainer>
               <Toast $type={toast.type}>
@@ -754,7 +786,7 @@ const PlaceholderText = styled.div`
 `;
 
 // Winner overlay content - uses useGame hook
-const WinnerOverlayContent = ({ showToast }) => {
+const WinnerOverlayContent = ({ showToast, onShowRoomManager }) => {
   const { state, dispatch } = useGame();
 
   window.WINNER_DEBUG = state; // Debug: expose state to window
@@ -785,6 +817,22 @@ const WinnerOverlayContent = ({ showToast }) => {
     dispatch({ type: 'SET_WINNER', payload: null });
   };
 
+  const handleLeaveRoom = () => {
+    console.log('Leave room clicked from WinnerDisplay');
+    // 调用后端离开房间
+    ConnectionManager.leaveGame();
+    // 重置游戏状态并返回房间等待界面
+    dispatch({ type: 'SET_WINNER', payload: null });
+    dispatch({ type: 'SET_GAME_STATE', payload: 'waiting' });
+    dispatch({ type: 'SET_PLAYERS', payload: [] });
+    dispatch({ type: 'SET_HAND_CARDS', payload: [] });
+    dispatch({ type: 'SET_CURRENT_CARDS', payload: [] });
+    dispatch({ type: 'SET_LANDLORD', payload: null });
+    dispatch({ type: 'SET_LANDLORD_CARDS', payload: [] });
+    // 触发返回房间界面
+    onShowRoomManager && onShowRoomManager();
+  };
+
   return (
     <WinnerDisplay
       winner={state.winner}
@@ -792,6 +840,7 @@ const WinnerOverlayContent = ({ showToast }) => {
       isHost={isHost}
       onNextRound={handleNextRound}
       onClose={handleClose}
+      onLeaveRoom={handleLeaveRoom}
     />
   );
 };

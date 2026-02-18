@@ -114,6 +114,7 @@ class ConnectionManager {
   setGameId(gameId) {
     console.log('=== setGameId called:', gameId, 'connected:', this.connected);
     this.gameId = gameId;
+
     if (this.connected) {
       // Re-subscribe with new game ID
       console.log('Re-subscribing to game topics...');
@@ -320,6 +321,15 @@ class ConnectionManager {
 
   removeMessageListener(callback) {
     this.onMessageCallbacks = this.onMessageCallbacks.filter(cb => cb !== callback);
+  }
+
+  // Attempt to reconnect to an existing game
+  reconnect(playerId, gameId) {
+    console.log('Sending reconnect request for game:', gameId, 'player:', playerId);
+    this.sendMessage('/app/game/reconnect', {
+      playerId: playerId,
+      gameId: gameId
+    });
   }
 
   disconnect() {
