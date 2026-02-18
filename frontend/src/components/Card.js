@@ -25,7 +25,8 @@ const CardContainer = styled.div`
   cursor: pointer;
   transition: all 0.15s ease;
   transform: ${({ $isSelected }) => $isSelected ? 'translateY(-6px)' : 'none'};
-  border: 1px solid ${({ $isSelected }) => $isSelected ? '#ffcc00' : '#ccc'};
+  border: 2px solid ${({ $isSelected }) => $isSelected ? '#ff8c00' : '#ccc'};
+  box-shadow: ${({ $isSelected }) => $isSelected ? '0 0 12px rgba(255, 140, 0, 0.8), 0 4px 8px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.3)'};
   margin-bottom: ${({ $isSelected }) => $isSelected ? '6px' : '0'};
   flex-shrink: 0;
   overflow: hidden;
@@ -275,7 +276,7 @@ const getCardBackFontSize = (size) => {
 const CardBack = styled.div`
   width: 100%;
   height: 100%;
-  background: linear-gradient(135deg, #1a237e, #4a148c);
+  background: linear-gradient(135deg, #667eea, #764ba2);
   border-radius: 2px;
   display: flex;
   justify-content: center;

@@ -49,18 +49,28 @@ const PlayerSide = styled.div`
     width: 60px;
     gap: 3px;
   }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    width: 50px;
+    gap: 2px;
+  }
+
+  @media (max-width: 480px) and (orientation: landscape) {
+    width: 45px;
+    gap: 2px;
+  }
 `;
 
 const PlayerCard = styled.div`
-  background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
+  background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.15) 100%);
   border-radius: 12px;
   padding: 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(255,255,255,0.2);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+  border: 1px solid ${props => props.$isCurrent ? 'rgba(255,140,0,0.8)' : 'rgba(255,255,255,0.5)'};
+  box-shadow: ${props => props.$isCurrent ? '0 0 15px rgba(255,140,0,0.4), 0 4px 15px rgba(0,0,0,0.1)' : '0 4px 15px rgba(0,0,0,0.1)'};
   backdrop-filter: blur(5px);
 
   @media (max-width: 768px) {
@@ -80,8 +90,8 @@ const PlayerAvatar = styled.img`
   width: 60px;
   height: 60px;
   border-radius: 50%;
-  border: 2px solid ${props => props.$isCurrent ? '#4ecdc4' : 'rgba(255,255,255,0.3)'};
-  box-shadow: ${props => props.$isCurrent ? '0 0 15px rgba(78,205,196,0.5)' : '0 2px 8px rgba(0,0,0,0.3)'};
+  border: 2px solid ${props => props.$isCurrent ? '#ff8c00' : 'rgba(255,255,255,0.3)'};
+  box-shadow: ${props => props.$isCurrent ? '0 0 15px rgba(255,140,0,0.6)' : '0 2px 8px rgba(0,0,0,0.3)'};
   object-fit: cover;
 
   @media (max-width: 768px) {
@@ -94,13 +104,24 @@ const PlayerAvatar = styled.img`
     height: 30px;
     border-width: 1px;
   }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    width: 28px;
+    height: 28px;
+    border-width: 1px;
+  }
+
+  @media (max-width: 480px) and (orientation: landscape) {
+    width: 24px;
+    height: 24px;
+  }
 `;
 
 const PlayerName = styled.div`
   font-size: 14px;
   font-weight: ${props => props.$isCurrent ? 'bold' : 'normal'};
-  color: ${props => props.$isCurrent ? '#4ecdc4' : 'rgba(255,255,255,0.9)'};
-  text-shadow: ${props => props.$isCurrent ? '0 0 10px #4ecdc4' : '0 1px 3px rgba(0,0,0,0.5)'};
+  color: ${props => props.$isCurrent ? '#ff8c00' : 'rgba(255,255,255,0.9)'};
+  text-shadow: ${props => props.$isCurrent ? '0 0 10px rgba(255,140,0,0.6)' : '0 1px 3px rgba(0,0,0,0.5)'};
   transition: all 0.3s ease;
 
   @media (max-width: 768px) {
@@ -114,17 +135,18 @@ const PlayerName = styled.div`
     text-overflow: ellipsis;
     max-width: 55px;
   }
-`;
 
-const PlayerCards = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 2px;
-  min-height: 80px;
+  @media (max-height: 500px) and (orientation: landscape) {
+    font-size: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 45px;
+  }
 
-  @media (max-width: 768px) {
-    min-height: 50px;
+  @media (max-width: 480px) and (orientation: landscape) {
+    font-size: 7px;
+    max-width: 40px;
   }
 `;
 
@@ -138,6 +160,14 @@ const CardCount = styled.div`
 
   @media (max-width: 480px) {
     font-size: 8px;
+  }
+
+  @media (max-height: 500px) and (orientation: landscape) {
+    font-size: 7px;
+  }
+
+  @media (max-width: 480px) and (orientation: landscape) {
+    font-size: 6px;
   }
 `;
 
@@ -174,9 +204,9 @@ const PlayedCardsContainer = styled.div`
   gap: 4px;
   min-height: 100px;
   padding: 20px;
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   min-width: 300px;
 
   @media (max-width: 768px) {
@@ -319,10 +349,10 @@ const LandlordCardsContainer = styled.div`
   align-items: center;
   gap: 8px;
   padding: 15px 25px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.25);
   border-radius: 16px;
-  border: 2px solid ${props => props.$isLandlord ? 'rgba(255, 107, 107, 0.6)' : 'rgba(255, 255, 255, 0.15)'};
-  box-shadow: ${props => props.$isLandlord ? '0 0 20px rgba(255, 107, 107, 0.3)' : 'none'};
+  border: 2px solid ${props => props.$isLandlord ? 'rgba(255, 107, 107, 0.8)' : 'rgba(255, 255, 255, 0.4)'};
+  box-shadow: ${props => props.$isLandlord ? '0 0 20px rgba(255, 107, 107, 0.3)' : '0 4px 15px rgba(0,0,0,0.1)'};
   transition: all 0.3s ease;
   flex-shrink: 0;
 
@@ -480,7 +510,7 @@ const GameTable = () => {
     <TableContainer>
       {/* Left player (上家) */}
       <PlayerSide>
-        <PlayerCard>
+        <PlayerCard $isCurrent={leftPlayer && isCurrentPlayer(leftPlayer.id)}>
           <PlayerAvatar
             src={playerAvatar}
             alt="头像"
@@ -542,7 +572,7 @@ const GameTable = () => {
 
       {/* Right player (下家) */}
       <PlayerSide>
-        <PlayerCard>
+        <PlayerCard $isCurrent={rightPlayer && isCurrentPlayer(rightPlayer.id)}>
           <PlayerAvatar
             src={playerAvatar}
             alt="头像"
