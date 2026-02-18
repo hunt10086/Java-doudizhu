@@ -58,6 +58,17 @@ npm run build
 - `/topic/game/created_{playerId}` - Player-specific game created events
 - `/topic/game/joined_{playerId}` - Player-specific join confirmation
 
+**Game Events (GameEvent.EventType):**
+- `PLAYER_JOIN` - Player joined the game
+- `GAME_START` - Game started
+- `CARDS_DEAL` - Cards dealt to players
+- `BID_REQUEST` - Request player to bid (叫地主)
+- `BID_RESPONSE` - Player's bid response
+- `PLAY_CARDS` - Player played cards
+- `PASS_TURN` - Player passed
+- `TURN_START` - New turn started (includes turnStartTime for countdown)
+- `GAME_END` - Game ended
+
 ### Frontend (React)
 
 - **App.js** - Main component with game layout and message handling
@@ -75,10 +86,13 @@ npm run build
   currentCards: [],      // Cards on table
   gameState: 'waiting',  // waiting, bidding, playing, finished
   landlordId: null,      // Landlord player ID
-  myPlayerId: null,      // Current user's player ID
-  handCards: [],         // User's hand cards
-  selectedCards: [],     // Selected cards for playing
-  canPass: true          // Whether player can "不要"
+  landlordCards: [],     // Landlord's 3 bottom cards (visible to all)
+  myPlayerId: null,     // Current user's player ID
+  handCards: [],        // User's hand cards
+  selectedCards: [],    // Selected cards for playing
+  canPass: true,        // Whether player can "不要"
+  turnStartTime: null,  // Timestamp when current turn started (for 30s countdown)
+  playerCardCounts: {}   // Card count for each player
 }
 ```
 
@@ -99,6 +113,11 @@ npm run build
 - Players can 叫 (bid) or 不叫 (pass)
 - First bidder becomes landlord if everyone passes
 - After landlord determined, landlord cards added to landlord's hand
+
+### Player Identity Display
+- **Landlord (地主)**: Red badge displayed on player avatar in GameTable.js
+- **Farmer (农民)**: Green badge displayed on non-landlord players after landlord is determined
+- Identity is determined by comparing playerId with landlordId in game state
 
 ## Common Development Tasks
 
@@ -122,6 +141,9 @@ Open browser console (F12) to see debug logs:
 - `GameControls render:` - Shows current player, game state
 - `PLAY_CARDS event received:` - Card play events
 - `Received game event:` - All WebSocket events
+- `Turn started for player:` - Turn start events for countdown
+- `GameTable Timer effect:` - Timer display for left/right players
+- `BottomTimer effect:` - Timer display for current player
 
 ## Commit Message Format
 
