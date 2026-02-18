@@ -12,7 +12,8 @@ public class GameEvent {
         GAME_END,
         PLAYER_DISCONNECT,
         CHAT_MESSAGE,
-        NEXT_ROUND
+        NEXT_ROUND,
+        TURN_START
     }
 
     private EventType type;

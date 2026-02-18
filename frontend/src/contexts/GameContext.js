@@ -19,7 +19,8 @@ const initialState = {
   canPass: true,  // Whether current player can pass (不要)
   winner: null,  // Winner of the game
   currentEffect: null,  // Current card type effect to display
-  screenShake: { active: false, isJoker: false }  // Screen shake effect state
+  screenShake: { active: false, isJoker: false },  // Screen shake effect state
+  turnStartTime: null  // Timestamp when current player's turn started
 };
 
 function gameReducer(state, action) {
@@ -107,6 +108,9 @@ function gameReducer(state, action) {
     case 'ADD_PLAYER':
       // Add a new player to the players array
       return { ...state, players: [...(state.players || []), action.payload] };
+    case 'SET_TURN_START_TIME':
+      // Set the turn start timestamp
+      return { ...state, turnStartTime: action.payload };
     default:
       return state;
   }

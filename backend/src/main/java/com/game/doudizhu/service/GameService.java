@@ -42,6 +42,8 @@ public class GameService {
 
     // Store active games
     private final Map<String, GameState> activeGames = new ConcurrentHashMap<>();
+    // 超时任务管理：gameId -> Future
+    private final Map<String, java.util.concurrent.ScheduledFuture<?>> turnTimeoutTasks = new ConcurrentHashMap<>();
     private final SecureRandom random = new SecureRandom();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
 
@@ -49,6 +51,15 @@ public class GameService {
      * Create a new game room
      */
     public GameState createGame(String playerId, String playerName) {
+        // 检查该playerId是否已在其他游戏中（防止重复创建/加入）
+        for (GameState gs : activeGames.values()) {
+            for (Player p : gs.getPlayers()) {
+                if (p.getId().equals(playerId)) {
+                    throw new RuntimeException("您已在其他房间中，请先离开");
+                }
+            }
+        }
+
         // Generate a short 6-character room ID
         String roomId = generateRoomId();
         String gameId = "game_" + roomId;
@@ -123,6 +134,13 @@ public class GameService {
 
         if (gameState.getPlayers().size() >= 3) {
             throw new RuntimeException("Game is full: " + gameId);
+        }
+
+        // 检查该playerId是否已在本游戏中（防止同一用户重复加入）
+        for (Player existingPlayer : gameState.getPlayers()) {
+            if (existingPlayer.getId().equals(playerId)) {
+                throw new RuntimeException("您已在该房间中");
+            }
         }
 
         // Add player to game
@@ -551,6 +569,102 @@ public class GameService {
     }
 
     /**
+     * 调度玩家思考超时处理（30秒）
+     * 如果超时，地主出最小的一张牌，非地主不出牌
+     */
+    private void scheduleTurnTimeout(String gameId) {
+        // 取消之前的超时任务
+        java.util.concurrent.ScheduledFuture<?> existingTask = turnTimeoutTasks.get(gameId);
+        if (existingTask != null) {
+            existingTask.cancel(false);
+        }
+
+        GameState gameState = activeGames.get(gameId);
+        if (gameState == null || gameState.getStatus() != GameState.Status.PLAYING) {
+            return;
+        }
+
+        String currentPlayerId = gameState.getCurrentPlayerId();
+        if (currentPlayerId == null || currentPlayerId.startsWith("AI_")) {
+            return; // AI 玩家不需要超时处理
+        }
+
+        // 调度30秒后的超时处理
+        java.util.concurrent.ScheduledFuture<?> future = scheduler.schedule(() -> {
+            GameState gs = activeGames.get(gameId);
+            if (gs == null) return;
+
+            // 检查是否仍然是同一个玩家的回合
+            if (!currentPlayerId.equals(gs.getCurrentPlayerId())) {
+                return; // 玩家已经出牌，超时任务取消
+            }
+
+            if (gs.getStatus() != GameState.Status.PLAYING) {
+                return;
+            }
+
+            System.out.println("=== Player timeout: " + currentPlayerId + " ===");
+
+            // 判断是否是地主
+            boolean isLandlord = currentPlayerId.equals(gs.getLandlordId());
+
+            if (isLandlord) {
+                // 地主：出最小的一张牌
+                Player landlord = gs.getPlayers().stream()
+                    .filter(p -> p.getId().equals(currentPlayerId))
+                    .findFirst()
+                    .orElse(null);
+
+                if (landlord != null && !landlord.getHand().isEmpty()) {
+                    // 找出最小的牌
+                    List<Card> hand = landlord.getHand();
+                    Card minCard = hand.get(0);
+                    for (Card c : hand) {
+                        if (getCardValue(c) < getCardValue(minCard)) {
+                            minCard = c;
+                        }
+                    }
+
+                    List<Card> cardsToPlay = new ArrayList<>();
+                    cardsToPlay.add(minCard);
+
+                    try {
+                        System.out.println("=== Landlord timeout auto-play: " + minCard);
+                        playCards(gameId, currentPlayerId, cardsToPlay);
+                    } catch (Exception e) {
+                        System.out.println("=== Auto-play failed: " + e.getMessage());
+                        // 如果出牌失败，尝试不出
+                        try {
+                            passTurn(gameId, currentPlayerId);
+                        } catch (Exception ex) {
+                            // Ignore
+                        }
+                    }
+                }
+            } else {
+                // 非地主：不出牌
+                try {
+                    System.out.println("=== Non-landlord timeout: auto pass");
+                    passTurn(gameId, currentPlayerId);
+                } catch (Exception e) {
+                    System.out.println("=== Auto pass failed: " + e.getMessage());
+                }
+            }
+        }, 30, TimeUnit.SECONDS);
+
+        turnTimeoutTasks.put(gameId, future);
+    }
+
+    /**
+     * 获取牌的数值用于比较
+     */
+    private int getCardValue(Card card) {
+        if (card == null) return 0;
+        String rank = card.getRank();
+        return CARD_VALUES.getOrDefault(rank, 0);
+    }
+
+    /**
      * Process a bid response
      * @param gameId the game ID
      * @param playerId the player ID
@@ -766,6 +880,8 @@ public class GameService {
             );
             messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, playRequest);
             scheduleAIResponse(broadcastGameId);
+            // 调度玩家思考超时（30秒）
+            scheduleTurnTimeout(broadcastGameId);
             return;
         }
 
@@ -981,6 +1097,12 @@ public class GameService {
 
         // Schedule AI response for first play
         scheduleAIResponse(broadcastGameId);
+
+        // 调度玩家思考超时（30秒）
+        scheduleTurnTimeout(broadcastGameId);
+
+        // 发送回合开始事件，用于前端倒计时
+        sendTurnStartEvent(broadcastGameId, finalLandlordId);
     }
 
     /**
@@ -1095,6 +1217,12 @@ public class GameService {
 
             // Schedule AI response for next player
             scheduleAIResponse(broadcastGameId);
+
+            // 调度玩家思考超时（30秒）
+            scheduleTurnTimeout(broadcastGameId);
+
+            // 发送回合开始事件，用于前端倒计时
+            sendTurnStartEvent(broadcastGameId, nextPlayer.getId());
         } else {
             // Game ended
             GameEvent endEvent = new GameEvent(
@@ -1174,6 +1302,12 @@ public class GameService {
 
             // Schedule AI response
             scheduleAIResponse(broadcastGameId);
+
+            // 调度玩家思考超时（30秒）
+            scheduleTurnTimeout(broadcastGameId);
+
+            // 发送回合开始事件，用于前端倒计时
+            sendTurnStartEvent(broadcastGameId, lastPlayerId);
             return;
         }
 
@@ -1206,6 +1340,25 @@ public class GameService {
 
         // Schedule AI response for next player
         scheduleAIResponse(broadcastGameId);
+
+        // 调度玩家思考超时（30秒）
+        scheduleTurnTimeout(broadcastGameId);
+
+        // 发送回合开始事件，用于前端倒计时
+        sendTurnStartEvent(broadcastGameId, nextPlayer.getId());
+    }
+
+    /**
+     * 发送回合开始事件，用于前端倒计时显示
+     */
+    private void sendTurnStartEvent(String gameId, String playerId) {
+        GameEvent turnStartEvent = new GameEvent(
+            GameEvent.EventType.TURN_START,
+            gameId,
+            playerId,
+            null
+        );
+        messagingTemplate.convertAndSend("/topic/game/" + gameId, turnStartEvent);
     }
 
     /**

@@ -411,6 +411,16 @@ const MessageHandler = ({ onGameStart }) => {
           console.log('Player disconnected:', data.playerId);
           break;
 
+        case 'TURN_START':
+          // Set current player and turn start time for countdown
+          if (data.playerId) {
+            dispatch({ type: 'SET_CURRENT_PLAYER', payload: { id: data.playerId } });
+            // Set turn start time to current timestamp
+            dispatch({ type: 'SET_TURN_START_TIME', payload: Date.now() });
+            console.log('Turn started for player:', data.playerId);
+          }
+          break;
+
         default:
           break;
       }
@@ -537,7 +547,10 @@ function App() {
 
             <BottomArea>
               <HandCardsArea>
-                <HandCardsLabel>您的手牌</HandCardsLabel>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <HandCardsLabel>您的手牌</HandCardsLabel>
+                  <BottomTimer />
+                </div>
                 <HandCardsList>
                   <CardContent />
                 </HandCardsList>
@@ -607,6 +620,63 @@ const CardContent = () => {
       />
     </HandCard>
   ));
+};
+
+// Bottom timer component for current player
+const BottomTimer = () => {
+  const { state } = useGame();
+  const [timeLeft, setTimeLeft] = useState(0);
+
+  useEffect(() => {
+    console.log('BottomTimer effect:', { turnStartTime: state.turnStartTime, gameState: state.gameState, currentPlayer: state.currentPlayer?.id, myPlayerId: state.myPlayerId });
+    const isMyTurn = state.currentPlayer?.id === state.myPlayerId;
+    if (state.turnStartTime && state.gameState === 'playing' && isMyTurn) {
+      const startTime = state.turnStartTime;
+      const updateTimer = () => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const remaining = Math.max(0, 30 - elapsed);
+        setTimeLeft(remaining);
+      };
+
+      updateTimer();
+      const interval = setInterval(updateTimer, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setTimeLeft(0);
+    }
+  }, [state.turnStartTime, state.gameState, state.currentPlayer, state.myPlayerId]);
+
+  if (timeLeft <= 0) {
+    return null;
+  }
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      marginLeft: '10px'
+    }}>
+      <svg width="28" height="28" viewBox="0 0 28 28" style={{ transform: 'rotate(-90deg)' }}>
+        <circle cx="14" cy="14" r="12" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3" />
+        <circle
+          cx="14" cy="14" r="12"
+          fill="none"
+          stroke={timeLeft <= 5 ? '#e74c3c' : '#3498db'}
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray={2 * Math.PI * 12}
+          strokeDashoffset={2 * Math.PI * 12 * (1 - timeLeft / 30)}
+          style={{ transition: 'stroke-dashoffset 1s linear' }}
+        />
+      </svg>
+      <span style={{
+        color: timeLeft <= 5 ? '#e74c3c' : 'white',
+        fontWeight: 'bold',
+        fontSize: '14px'
+      }}>{timeLeft}</span>
+    </div>
+  );
 };
 
 const PlaceholderText = styled.div`

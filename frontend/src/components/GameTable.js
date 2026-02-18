@@ -234,6 +234,85 @@ const LandlordBadge = styled.div`
   }
 `;
 
+const FarmerBadge = styled.div`
+  font-size: 12px;
+  color: #27ae60;
+  font-weight: bold;
+
+  @media (max-width: 768px) {
+    font-size: 9px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 7px;
+  }
+`;
+
+// Timer components
+const TimerContainer = styled.div`
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 5px;
+`;
+
+const TimerCircle = styled.svg`
+  transform: rotate(-90deg);
+`;
+
+const TimerBackground = styled.circle`
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.2);
+  stroke-width: 3;
+`;
+
+const TimerProgress = styled.circle`
+  fill: none;
+  stroke: ${props => props.$timeLeft <= 5 ? '#e74c3c' : '#3498db'};
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s linear, stroke 0.3s;
+`;
+
+const TimerText = styled.span`
+  position: absolute;
+  font-size: 10px;
+  font-weight: bold;
+  color: white;
+`;
+
+// Timer component
+const TableTimer = ({ timeLeft, maxTime = 30 }) => {
+  const radius = 12;
+  const circumference = 2 * Math.PI * radius;
+  const progress = (timeLeft / maxTime) * circumference;
+  const strokeDashoffset = circumference - progress;
+
+  if (timeLeft <= 0 || timeLeft > maxTime) {
+    return null;
+  }
+
+  return (
+    <TimerContainer>
+      <TimerCircle width="28" height="28" viewBox="0 0 28 28">
+        <TimerBackground cx="14" cy="14" r={radius} />
+        <TimerProgress
+          cx="14"
+          cy="14"
+          r={radius}
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          $timeLeft={timeLeft}
+        />
+      </TimerCircle>
+      <TimerText>{timeLeft}</TimerText>
+    </TimerContainer>
+  );
+};
+
 const LandlordCardsContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -323,6 +402,7 @@ const SmallCardWrapper = styled.div`
 const GameTable = () => {
   const { state } = useGame();
   const [centerCards, setCenterCards] = useState([]);
+  const [timeLeft, setTimeLeft] = useState(0);
 
   useEffect(() => {
     if (state.currentCards && state.currentCards.length > 0) {
@@ -331,6 +411,25 @@ const GameTable = () => {
       setCenterCards([]);
     }
   }, [state.currentCards]);
+
+  // Timer effect
+  useEffect(() => {
+    console.log('GameTable Timer effect:', { turnStartTime: state.turnStartTime, gameState: state.gameState, currentPlayer: state.currentPlayer?.id });
+    if (state.turnStartTime && state.gameState === 'playing') {
+      const startTime = state.turnStartTime;
+      const updateTimer = () => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const remaining = Math.max(0, 30 - elapsed);
+        setTimeLeft(remaining);
+      };
+
+      updateTimer();
+      const interval = setInterval(updateTimer, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setTimeLeft(0);
+    }
+  }, [state.turnStartTime, state.gameState, state.currentPlayer]);
 
   // Get my player index to determine positions
   const getMyPlayerIndex = () => {
@@ -364,6 +463,11 @@ const GameTable = () => {
     return state.landlordId === playerId;
   };
 
+  // Check if a player is farmer (not landlord, but landlord is determined)
+  const isFarmer = (playerId) => {
+    return state.landlordId && playerId && playerId !== state.landlordId;
+  };
+
   // Get card count for a player
   const getCardCount = (playerId) => {
     return state.playerCardCounts?.[playerId] || 0;
@@ -386,6 +490,10 @@ const GameTable = () => {
             {leftPlayer?.name || '等待加入...'}
           </PlayerName>
           {leftPlayer && isLandlord(leftPlayer.id) && <LandlordBadge>地主</LandlordBadge>}
+          {leftPlayer && isFarmer(leftPlayer.id) && <FarmerBadge>农民</FarmerBadge>}
+          {leftPlayer && isCurrentPlayer(leftPlayer.id) && state.gameState === 'playing' && (
+            <TableTimer timeLeft={timeLeft} />
+          )}
         </PlayerCard>
         <CardCount>{leftPlayer ? `${getCardCount(leftPlayer.id)}张牌` : ''}</CardCount>
       </PlayerSide>
@@ -444,6 +552,10 @@ const GameTable = () => {
             {rightPlayer?.name || '等待加入...'}
           </PlayerName>
           {rightPlayer && isLandlord(rightPlayer.id) && <LandlordBadge>地主</LandlordBadge>}
+          {rightPlayer && isFarmer(rightPlayer.id) && <FarmerBadge>农民</FarmerBadge>}
+          {rightPlayer && isCurrentPlayer(rightPlayer.id) && state.gameState === 'playing' && (
+            <TableTimer timeLeft={timeLeft} />
+          )}
         </PlayerCard>
         <CardCount>{rightPlayer ? `${getCardCount(rightPlayer.id)}张牌` : ''}</CardCount>
       </PlayerSide>
