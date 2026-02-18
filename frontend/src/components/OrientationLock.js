@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import styled, { keyframes, css } from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 
 const rotatePhone = keyframes`
   0% { transform: rotate(0deg); }
@@ -17,7 +17,7 @@ const OrientationOverlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
+  background: linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -36,14 +36,14 @@ const PhoneIcon = styled.div`
 `;
 
 const Title = styled.h2`
-  color: white;
+  color: #2c3e50;
   font-size: 24px;
   margin-bottom: 15px;
   text-align: center;
 `;
 
 const Message = styled.p`
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(0, 0, 0, 0.7);
   font-size: 16px;
   text-align: center;
   line-height: 1.6;
@@ -65,7 +65,7 @@ const ArrowIcon = styled.div`
 `;
 
 const ArrowText = styled.span`
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(0, 0, 0, 0.5);
   font-size: 14px;
 `;
 

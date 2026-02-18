@@ -259,6 +259,42 @@ public class GameController {
     }
 
     /**
+     * Handle requests to leave a game
+     */
+    @MessageMapping("/game/leave")
+    public void leaveGame(@Payload GameEvent event) {
+        String gameId = event.getGameId();
+        String playerId = event.getPlayerId();
+        System.out.println("=== LEAVE GAME === playerId: " + playerId + ", gameId: " + gameId);
+
+        try {
+            boolean success = gameService.leaveGame(gameId, playerId);
+
+            if (!success) {
+                // Cannot leave while game is in progress
+                GameEvent errorEvent = new GameEvent(
+                    GameEvent.EventType.PLAYER_LEAVE,
+                    gameId,
+                    playerId,
+                    "游戏中无法离开房间"
+                );
+                messagingTemplate.convertAndSendToUser(playerId, "/queue/errors", errorEvent);
+            }
+        } catch (Exception e) {
+            System.out.println("Error leaving game: " + e.getMessage());
+            e.printStackTrace();
+
+            GameEvent errorEvent = new GameEvent(
+                GameEvent.EventType.PLAYER_LEAVE,
+                gameId,
+                playerId,
+                "离开房间失败: " + e.getMessage()
+            );
+            messagingTemplate.convertAndSendToUser(playerId, "/queue/errors", errorEvent);
+        }
+    }
+
+    /**
      * Handle chat messages
      */
     @MessageMapping("/chat/send")

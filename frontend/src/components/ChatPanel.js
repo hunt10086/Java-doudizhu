@@ -4,29 +4,30 @@ import connectionManager from '../services/ConnectionManager';
 import { useGame } from '../contexts/GameContext';
 
 const ChatContainer = styled.div`
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.25);
   border-radius: 10px;
   display: flex;
   flex-direction: column;
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
   flex: 1;
-  min-height: 300px;
+  min-height: 200px;
+  max-height: 100%;
+  overflow: hidden;
 
   @media (max-width: 768px) {
-    min-height: 200px;
+    min-height: 180px;
     border-radius: 8px;
   }
 `;
 
 const ChatHeader = styled.div`
   padding: 10px 15px;
-  background: rgba(0, 0, 0, 0.2);
-  color: white;
+  background: rgba(0, 0, 0, 0.1);
+  color: #2c3e50;
   font-weight: bold;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 
   @media (max-width: 768px) {
     padding: 8px 10px;
@@ -38,9 +39,11 @@ const MessagesContainer = styled.div`
   flex: 1;
   padding: 10px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
 
   @media (max-width: 768px) {
     padding: 8px;
@@ -67,8 +70,8 @@ const MessageBubble = styled.div`
     align-self: flex-end;
     border-bottom-right-radius: 4px;
   ` : `
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
+    background: rgba(255, 255, 255, 0.5);
+    color: #2c3e50;
     align-self: flex-start;
     border-bottom-left-radius: 4px;
   `}
@@ -78,6 +81,7 @@ const MessageInfo = styled.div`
   font-size: 11px;
   opacity: 0.7;
   margin-bottom: 2px;
+  color: #2c3e50;
 
   @media (max-width: 768px) {
     font-size: 10px;
@@ -86,13 +90,66 @@ const MessageInfo = styled.div`
 
 const InputContainer = styled.div`
   display: flex;
+  flex-direction: column;
   padding: 10px;
-  background: rgba(0, 0, 0, 0.2);
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.08);
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+  min-height: 70px;
 
   @media (max-width: 768px) {
     padding: 8px;
+    min-height: 60px;
   }
+`;
+
+const QuickMessageContainer = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  max-width: 100%;
+
+  @media (max-width: 768px) {
+    gap: 3px;
+    margin-bottom: 4px;
+    padding-bottom: 4px;
+  }
+`;
+
+const QuickMessageButton = styled.button`
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 10px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: #2c3e50;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(52, 152, 219, 0.3);
+    border-color: #3498db;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  @media (max-width: 768px) {
+    padding: 2px 6px;
+    font-size: 10px;
+    border-radius: 8px;
+  }
+`;
+
+const InputRow = styled.div`
+  display: flex;
+  align-items: center;
 `;
 
 const MessageInput = styled.input`
@@ -100,8 +157,8 @@ const MessageInput = styled.input`
   padding: 10px 15px;
   border: none;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  background: rgba(255, 255, 255, 0.4);
+  color: #2c3e50;
   font-size: 14px;
   outline: none;
 
@@ -112,7 +169,7 @@ const MessageInput = styled.input`
   }
 
   &::placeholder {
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(0, 0, 0, 0.4);
   }
 `;
 
@@ -153,11 +210,42 @@ const SendButton = styled.button`
   }
 `;
 
+const QUICK_MESSAGES = [
+  '能不能快点啊',
+  '等一下',
+  '不好意思',
+  '地主加油',
+  '农民加油',
+  '好牌啊'
+];
+
 const ChatPanel = () => {
   const { state } = useGame();
   const [messages, setMessages] = useState([]);
   const [inputValue, setInputValue] = useState('');
   const [pendingMessageId, setPendingMessageId] = useState(null); // Track pending message to avoid duplicate
+
+  const handleQuickMessage = (text) => {
+    if (text.trim() === '') return;
+
+    // Generate a unique message ID
+    const messageId = Date.now();
+    setPendingMessageId(messageId);
+
+    // Send via WebSocket with message ID
+    connectionManager.sendChat({ text, messageId });
+
+    // Add to local messages immediately
+    const newMessage = {
+      id: messageId,
+      sender: '我',
+      text: text,
+      timestamp: new Date().toLocaleTimeString(),
+      isOwn: true
+    };
+
+    setMessages(prev => [...prev, newMessage]);
+  };
 
   useEffect(() => {
     // Add system welcome message
@@ -297,14 +385,26 @@ const ChatPanel = () => {
         ))}
       </MessagesContainer>
       <InputContainer>
-        <MessageInput
-          type="text"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="输入消息..."
-        />
-        <SendButton onClick={handleSend}>✓</SendButton>
+        <QuickMessageContainer>
+          {QUICK_MESSAGES.map((msg, index) => (
+            <QuickMessageButton
+              key={index}
+              onClick={() => handleQuickMessage(msg)}
+            >
+              {msg}
+            </QuickMessageButton>
+          ))}
+        </QuickMessageContainer>
+        <InputRow>
+          <MessageInput
+            type="text"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyPress={handleKeyPress}
+            placeholder="输入消息..."
+          />
+          <SendButton onClick={handleSend}>✓</SendButton>
+        </InputRow>
       </InputContainer>
     </ChatContainer>
   );

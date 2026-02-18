@@ -4,16 +4,16 @@ import { useGame } from '../contexts/GameContext';
 import ConnectionManager from '../services/ConnectionManager';
 
 const InfoContainer = styled.div`
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.25);
   border-radius: 10px;
   padding: 15px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  color: white;
+  color: #2c3e50;
   flex-shrink: 0;
 
   @media (max-width: 768px) {

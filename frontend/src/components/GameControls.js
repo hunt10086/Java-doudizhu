@@ -7,9 +7,9 @@ const ControlsContainer = styled.div`
   display: flex;
   gap: 8px;
   padding: 10px 16px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
+  background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.25) 100%);
   border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.5);
   backdrop-filter: blur(10px);
 
   @media (max-width: 768px) {
@@ -72,7 +72,7 @@ const ControlButton = styled.button`
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%);
+    background: linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 100%);
     opacity: 0;
     transition: opacity 0.2s;
   }
@@ -121,13 +121,13 @@ const ControlButton = styled.button`
   `}
 
   ${props => props.$variant === 'secondary' && `
-    background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.05) 100%);
-    color: white;
-    border: 1px solid rgba(255,255,255,0.2);
+    background: linear-gradient(135deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.3) 100%);
+    color: #2c3e50;
+    border: 1px solid rgba(255,255,255,0.5);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 
     &:hover:not(:disabled) {
-      background: linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 100%);
+      background: linear-gradient(135deg, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.5) 100%);
     }
   `}
 `;
@@ -217,6 +217,7 @@ const GameControls = () => {
   // Get my player ID from connection manager (more reliable)
   const [myId, setMyId] = useState(connectionManager.getPlayerId());
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     // Update myId when it changes
     const id = connectionManager.getPlayerId();

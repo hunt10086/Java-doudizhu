@@ -31,6 +31,7 @@ public class GameState {
 
     // Playing related fields
     private String lastPlayerId = null;  // Last player who played cards (for cycle tracking)
+    private long turnStartTime = 0;      // Timestamp when current player's turn started
 
     // Constructors
     public GameState() {
@@ -103,4 +104,7 @@ public class GameState {
 
     public String getLastPlayerId() { return lastPlayerId; }
     public void setLastPlayerId(String lastPlayerId) { this.lastPlayerId = lastPlayerId; }
+
+    public long getTurnStartTime() { return turnStartTime; }
+    public void setTurnStartTime(long turnStartTime) { this.turnStartTime = turnStartTime; }
 }

@@ -9,7 +9,7 @@ const AuthContainer = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.8);
+  background-image: linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -17,16 +17,16 @@ const AuthContainer = styled.div`
 `;
 
 const AuthBox = styled.div`
-  background: #2c3e50;
+  background: rgba(255, 255, 255, 0.9);
   border-radius: 10px;
   padding: 30px;
   width: 400px;
   max-width: 90%;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 `;
 
 const Title = styled.h2`
-  color: white;
+  color: #2c3e50;
   text-align: center;
   margin-bottom: 25px;
   font-size: 24px;
@@ -35,14 +35,14 @@ const Title = styled.h2`
 const TabContainer = styled.div`
   display: flex;
   margin-bottom: 20px;
-  border-bottom: 2px solid #34495e;
+  border-bottom: 2px solid rgba(0, 0, 0, 0.1);
 `;
 
 const Tab = styled.div`
   flex: 1;
   padding: 10px;
   text-align: center;
-  color: ${props => props.$active ? '#3498db' : '#95a5a6'};
+  color: ${props => props.$active ? '#3498db' : '#7f8c8d'};
   cursor: pointer;
   border-bottom: 2px solid ${props => props.$active ? '#3498db' : 'transparent'};
   margin-bottom: -2px;
@@ -66,16 +66,16 @@ const InputGroup = styled.div`
 `;
 
 const Label = styled.label`
-  color: #ecf0f1;
+  color: #2c3e50;
   font-weight: bold;
 `;
 
 const Input = styled.input`
   padding: 12px;
-  border: 2px solid #34495e;
+  border: 2px solid rgba(0, 0, 0, 0.2);
   border-radius: 5px;
-  background: #34495e;
-  color: white;
+  background: rgba(255, 255, 255, 0.8);
+  color: #2c3e50;
   font-size: 16px;
 
   &:focus {

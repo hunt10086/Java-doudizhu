@@ -9,7 +9,7 @@ const RoomContainer = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.8);
+  background-image: linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -17,23 +17,23 @@ const RoomContainer = styled.div`
 `;
 
 const RoomBox = styled.div`
-  background: #2c3e50;
+  background: rgba(255, 255, 255, 0.9);
   border-radius: 10px;
   padding: 30px;
   width: 450px;
   max-width: 90%;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 `;
 
 const Title = styled.h2`
-  color: white;
+  color: #2c3e50;
   text-align: center;
   margin-bottom: 25px;
   font-size: 24px;
 `;
 
 const RoomInfo = styled.div`
-  background: #34495e;
+  background: rgba(255, 255, 255, 0.5);
   border-radius: 8px;
   padding: 15px;
   margin-bottom: 20px;
@@ -49,14 +49,14 @@ const RoomCode = styled.div`
 `;
 
 const RoomStatus = styled.div`
-  color: ${props => props.$full ? '#2ecc71' : '#95a5a6'};
+  color: ${props => props.$full ? '#2ecc71' : '#7f8c8d'};
   font-size: 14px;
 `;
 
 const PlayerList = styled.div`
   margin: 15px 0;
   padding: 10px;
-  background: #34495e;
+  background: rgba(255, 255, 255, 0.5);
   border-radius: 8px;
 `;
 
@@ -65,7 +65,7 @@ const PlayerItem = styled.div`
   justify-content: space-between;
   align-items: center;
   padding: 8px;
-  color: ${props => props.$isHost ? '#f39c12' : '#ecf0f1'};
+  color: ${props => props.$isHost ? '#f39c12' : '#2c3e50'};
   font-weight: ${props => props.$isHost ? 'bold' : 'normal'};
 `;
 
@@ -91,16 +91,16 @@ const InputGroup = styled.div`
 `;
 
 const Label = styled.label`
-  color: #ecf0f1;
+  color: #2c3e50;
   font-weight: bold;
 `;
 
 const Input = styled.input`
   padding: 12px;
-  border: 2px solid #34495e;
+  border: 2px solid rgba(0, 0, 0, 0.2);
   border-radius: 5px;
-  background: #34495e;
-  color: white;
+  background: rgba(255, 255, 255, 0.8);
+  color: #2c3e50;
   font-size: 16px;
 
   &:focus {
@@ -195,7 +195,12 @@ const RoomManager = ({ onGameStart, userInfo }) => {
 
   // Connect to server when component mounts
   useEffect(() => {
-    const playerId = `player_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    // 使用localStorage持久化playerId，防止同一浏览器重复加入
+    let playerId = localStorage.getItem('doudizhu_playerId');
+    if (!playerId) {
+      playerId = `player_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      localStorage.setItem('doudizhu_playerId', playerId);
+    }
     setMyPlayerId(playerId);
 
     // Set my player ID in context
@@ -220,6 +225,7 @@ const RoomManager = ({ onGameStart, userInfo }) => {
   }, [dispatch]);
 
   // Listen for game events
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const handleMessage = (data) => {
       console.log('=== RoomManager received ===', data);

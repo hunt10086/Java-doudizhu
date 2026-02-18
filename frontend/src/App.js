@@ -82,6 +82,7 @@ const AppContainer = styled.div`
   height: 100vh;
   overflow: hidden;
   position: relative;
+  background-image: linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%);
 `;
 
 // Game layout - Full screen game area
@@ -103,18 +104,20 @@ const GameLayout = styled.div`
     padding: 4px;
     gap: 4px;
   }
+
+  /* 移动端确保底部区域有足够空间 */
+  @media (max-width: 1024px), (max-height: 800px) {
+    gap: 5px;
+  }
 `;
 
 // Top bar with game info
 const TopBar = styled.div`
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
-
-  @media (max-height: 500px) and (orientation: landscape) {
-    height: 25px;
-  }
+  padding: 0 10px;
 `;
 
 // Main game area - flex to take remaining space
@@ -125,43 +128,70 @@ const MainArea = styled.div`
   min-height: 0;
   overflow: hidden;
 
+  /* 移动端限制中间区域高度，给底部留空间 */
+  @media (max-width: 1024px), (max-height: 800px) {
+    flex: 1;
+    max-height: 55%;
+  }
+
   @media (max-height: 500px) and (orientation: landscape) {
-    flex: 0.8;
+    flex: 1;
+    max-height: 50%;
     gap: 4px;
   }
 
   @media (max-width: 480px) and (orientation: landscape) {
-    flex: 0.7;
-    min-width: 35%;
+    flex: 1;
+    max-height: 45%;
+    gap: 3px;
   }
 `;
 
 // Left side - Game table
 const GameArea = styled.div`
   flex: 1;
+  max-width: calc(100% - 290px);
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   min-width: 0;
   animation: ${fadeIn} 0.5s ease-out;
+  position: relative;
+
+  @media (max-width: 900px) {
+    max-width: calc(100% - 250px);
+  }
+
+  /* 移动端游戏区域占满宽度 */
+  @media (max-width: 1024px), (max-height: 800px) {
+    max-width: 100%;
+  }
 
   @media (max-height: 500px) and (orientation: landscape) {
+    max-width: 100%;
     min-height: 0;
+  }
+
+  @media (max-width: 480px) and (orientation: landscape) {
+    max-width: 100%;
   }
 `;
 
-// Right side - Info panel
+// Right side - Info panel (chat and player info)
 const SidePanel = styled.div`
-  width: 200px;
+  width: 280px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
+  padding: 5px;
 
-  @media (max-width: 768px) {
-    display: none;
+  @media (max-width: 900px) {
+    width: 240px;
   }
 
-  @media (max-height: 500px) and (orientation: landscape) {
+  /* 移动端始终隐藏聊天面板 */
+  @media (max-width: 1024px), (max-height: 800px) {
     display: none;
   }
 `;
@@ -173,22 +203,41 @@ const BottomArea = styled.div`
   gap: 10px;
   flex-shrink: 0;
   animation: ${fadeIn} 0.6s ease-out;
-  min-height: 0;
+  min-height: 120px;
   overflow: hidden;
 
-  @media (max-height: 500px) and (orientation: landscape) {
-    flex: 1;
-    min-width: 65%;
-    max-width: 75%;
+  /* 移动端底部区域优先级更高 */
+  @media (max-width: 1024px), (max-height: 800px) {
+    flex: 0 0 45%;
+    min-height: 35%;
+    max-height: 50%;
+    gap: 5px;
+  }
+
+  @media (max-width: 768px) {
+    min-height: 35%;
+    gap: 5px;
+  }
+
+  @media (max-width: 480px) {
+    min-height: 40%;
+    gap: 4px;
+  }
+
+  @media (max-height: 600px) and (orientation: landscape) {
+    flex: 0 0 45%;
+    min-width: 100%;
     gap: 3px;
-    min-height: 100px;
+    min-height: 40%;
+    max-height: 50%;
   }
 
   @media (max-width: 480px) and (orientation: landscape) {
-    flex: 1;
-    min-width: 70%;
+    flex: 0 0 50%;
+    min-width: 100%;
     gap: 2px;
-    min-height: 90px;
+    min-height: 45%;
+    max-height: 55%;
   }
 `;
 
@@ -203,6 +252,7 @@ const HandCard = styled.div`
 const MessageHandler = ({ onGameStart }) => {
   const { state, dispatch } = useGame();
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const handleMessage = (data) => {
       // Get current playerId from ConnectionManager
@@ -246,7 +296,9 @@ const MessageHandler = ({ onGameStart }) => {
               dispatch({ type: 'SET_PLAYER_CARD_COUNTS', payload: data.data.playerCardCounts });
             }
           }
-          if (data.data && !data.data.roomId) {
+          // Only show room manager when status is WAITING and there's no roomId
+          // This handles the initial game creation case, not the playing state updates
+          if (data.data && !data.data.roomId && data.data.status === 'WAITING') {
             onGameStart && onGameStart();
           }
           break;
@@ -494,6 +546,20 @@ function App() {
             score: response.data.score
           });
           setIsLoggedIn(true);
+
+          // Check for saved game state in localStorage
+          const savedGameState = localStorage.getItem('doudizhu_gameState');
+          if (savedGameState) {
+            try {
+              const gameState = JSON.parse(savedGameState);
+              console.log('Found saved game state:', gameState);
+              // If there's a saved game state, we can try to reconnect
+              // But for now, we'll let user manually rejoin
+            } catch (e) {
+              console.error('Failed to parse saved game state:', e);
+              localStorage.removeItem('doudizhu_gameState');
+            }
+          }
         }
       } catch (error) {
         console.error('检查登录状态失败:', error);
@@ -514,7 +580,7 @@ function App() {
     <GameProvider initialState={initialGameState}>
       <GlobalStyle />
       <OrientationLock />
-      <MessageHandler />
+      <MessageHandler onGameStart={() => setShowRoomManager(true)} />
       {loading ? (
         <LoadingContainer>
           <LoadingText>加载中...</LoadingText>
@@ -538,6 +604,7 @@ function App() {
             <MainArea>
               <GameArea>
                 <GameTable />
+                <CardEffectDisplay />
               </GameArea>
 
               <SidePanel>
@@ -560,7 +627,6 @@ function App() {
               </ControlsArea>
             </BottomArea>
           </GameLayout>
-          <CardEffectDisplay />
           <WinnerOverlayContent showToast={showToast} />
           {toast && (
             <ToastContainer>
@@ -582,7 +648,7 @@ const LoadingContainer = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+  background-image: linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%);
 `;
 
 const LoadingText = styled.div`
@@ -689,7 +755,7 @@ const PlaceholderText = styled.div`
 
 // Winner overlay content - uses useGame hook
 const WinnerOverlayContent = ({ showToast }) => {
-  const { state } = useGame();
+  const { state, dispatch } = useGame();
 
   window.WINNER_DEBUG = state; // Debug: expose state to window
 
@@ -713,12 +779,19 @@ const WinnerOverlayContent = ({ showToast }) => {
     ConnectionManager.startNextRound();
   };
 
+  const handleClose = () => {
+    console.log('Winner overlay closed');
+    // Clear winner to hide the overlay
+    dispatch({ type: 'SET_WINNER', payload: null });
+  };
+
   return (
     <WinnerDisplay
       winner={state.winner}
       isLandlord={isLandlord}
       isHost={isHost}
       onNextRound={handleNextRound}
+      onClose={handleClose}
     />
   );
 };

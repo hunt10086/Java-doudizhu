@@ -488,6 +488,101 @@ public class GameService {
     }
 
     /**
+     * Handle player leaving the game
+     * Returns true if player successfully left, false if game was destroyed (host left)
+     */
+    public boolean leaveGame(String gameId, String playerId) {
+        GameState gameState = null;
+        // Find game by roomId or gameId
+        if (gameId != null && gameId.startsWith("game_")) {
+            gameState = activeGames.get(gameId);
+        } else if (gameId != null) {
+            // Search by roomId
+            for (GameState gs : activeGames.values()) {
+                if (gs.getRoomId() != null && gs.getRoomId().equalsIgnoreCase(gameId)) {
+                    gameState = gs;
+                    break;
+                }
+            }
+        }
+
+        if (gameState == null) {
+            return true; // Game doesn't exist, player can leave
+        }
+
+        String broadcastGameId = gameState.getGameId();
+        Player leavingPlayer = null;
+
+        // Find the leaving player
+        for (Player player : gameState.getPlayers()) {
+            if (player.getId().equals(playerId)) {
+                leavingPlayer = player;
+                break;
+            }
+        }
+
+        if (leavingPlayer == null) {
+            return true; // Player not in game
+        }
+
+        // Check if game is in progress (cannot leave while playing)
+        if (gameState.getStatus() == GameState.Status.PLAYING ||
+            gameState.getStatus() == GameState.Status.BIDDING) {
+            // Cannot leave while game is in progress
+            return false;
+        }
+
+        // Check if the leaving player is the host
+        boolean isHost = leavingPlayer.isHost();
+
+        // Remove player from game
+        gameState.getPlayers().remove(leavingPlayer);
+
+        // Broadcast player leave event
+        GameEvent leaveEvent = new GameEvent(
+            GameEvent.EventType.PLAYER_LEAVE,
+            broadcastGameId,
+            playerId,
+            leavingPlayer.getName()
+        );
+        messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, leaveEvent);
+
+        // If host left or no players left, destroy the game
+        if (isHost || gameState.getPlayers().isEmpty()) {
+            // Destroy the game
+            activeGames.remove(broadcastGameId);
+
+            // Broadcast game destroyed event
+            GameEvent destroyEvent = new GameEvent(
+                GameEvent.EventType.GAME_DESTROYED,
+                broadcastGameId,
+                null,
+                isHost ? "房主离开，房间已解散" : "房间已解散"
+            );
+            messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, destroyEvent);
+
+            return true;
+        }
+
+        // If the host left but there are still players, reassign host
+        if (isHost && !gameState.getPlayers().isEmpty()) {
+            Player newHost = gameState.getPlayers().get(0);
+            newHost.setHost(true);
+
+            // Broadcast new host info
+            GameEvent hostChangeEvent = new GameEvent(
+                GameEvent.EventType.GAME_START,
+                broadcastGameId,
+                newHost.getId(),
+                getBasicPlayerInfo(gameState.getPlayers())
+            );
+            messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, hostChangeEvent);
+        }
+
+        return true;
+    }
+
+    /**
      * Helper method to get basic player info without sensitive data like hand cards
      */
     private List<Map<String, Object>> getBasicPlayerInfo(List<Player> players) {

@@ -292,6 +292,14 @@ class ConnectionManager {
     });
   }
 
+  // Leave game room
+  leaveGame() {
+    this.sendMessage('/app/game/leave', {
+      playerId: this.playerId,
+      gameId: this.gameId
+    });
+  }
+
   // Send chat message
   sendChat(message) {
     this.sendMessage('/app/chat/send', {

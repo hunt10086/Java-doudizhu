@@ -212,11 +212,19 @@ const glowPulse = keyframes`
 // Effects container
 export const EffectContainer = styled.div`
   position: absolute;
-  top: 50%;
+  top: 35%;
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 100;
   pointer-events: none;
+
+  @media (max-width: 768px) {
+    top: 30%;
+  }
+
+  @media (max-width: 480px) {
+    top: 25%;
+  }
 `;
 
 // Bomb effect
@@ -319,17 +327,18 @@ export const WinnerBox = styled.div`
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 30px;
-  padding: 60px 100px;
+  gap: 20px;
+  padding: 30px 50px;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-  border-radius: 30px;
-  border: 3px solid;
+  border-radius: 20px;
+  border: 2px solid;
   border-color: ${props => props.$isLandlord ? '#ff6b6b' : '#4ecdc4'};
   box-shadow:
-    0 0 50px ${props => props.$isLandlord ? 'rgba(255,107,107,0.5)' : 'rgba(78,205,196,0.5)'},
-    inset 0 0 30px rgba(255,255,255,0.1);
+    0 0 30px ${props => props.$isLandlord ? 'rgba(255,107,107,0.4)' : 'rgba(78,205,196,0.4)'},
+    inset 0 0 20px rgba(255,255,255,0.1);
   position: relative;
   overflow: hidden;
+  min-width: 280px;
 
   &::before {
     content: '';
@@ -351,34 +360,54 @@ export const WinnerBox = styled.div`
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
+
+  @media (max-width: 480px) {
+    gap: 15px;
+    padding: 20px 30px;
+    min-width: 220px;
+    border-radius: 15px;
+  }
 `;
 
 export const WinnerTitle = styled.div`
-  font-size: 48px;
+  font-size: 28px;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 8px;
+  letter-spacing: 4px;
   background: linear-gradient(90deg, #f093fb 0%, #f5576c 50%, #f093fb 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   animation: ${glowPulse} 2s infinite;
   color: #f093fb;
-  text-shadow: 0 0 30px rgba(240, 147, 251, 0.5);
+  text-shadow: 0 0 20px rgba(240, 147, 251, 0.5);
+
+  @media (max-width: 480px) {
+    font-size: 20px;
+    letter-spacing: 2px;
+  }
 `;
 
 export const WinnerName = styled.div`
-  font-size: 64px;
+  font-size: 36px;
   font-weight: bold;
   color: ${props => props.$isLandlord ? '#ff6b6b' : '#4ecdc4'};
-  text-shadow: 0 0 30px currentColor;
+  text-shadow: 0 0 20px currentColor;
   animation: ${glowPulse} 1.5s infinite;
+
+  @media (max-width: 480px) {
+    font-size: 24px;
+  }
 `;
 
 export const WinnerSubtitle = styled.div`
-  font-size: 20px;
+  font-size: 16px;
   color: rgba(255,255,255,0.7);
-  margin-top: 10px;
+  margin-top: 5px;
+
+  @media (max-width: 480px) {
+    font-size: 14px;
+  }
 `;
 
 // Confetti
@@ -546,40 +575,45 @@ export const CardCount = styled.div`
 
 // Hand cards section enhanced
 export const HandCardsArea = styled.div`
-  background: linear-gradient(180deg, rgba(20, 20, 40, 0.9) 0%, rgba(10, 10, 30, 0.95) 100%);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.15) 100%);
   border-radius: 20px;
   padding: 15px 20px;
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.4);
   backdrop-filter: blur(20px);
   box-shadow:
-    0 10px 40px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  min-height: 0;
+    0 10px 40px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  min-height: 80px;
   overflow: hidden;
+  flex-shrink: 0;
 
   @media (max-width: 768px) {
     padding: 10px 12px;
     border-radius: 14px;
+    min-height: 60px;
   }
 
   @media (max-width: 480px) {
     padding: 8px 8px;
     border-radius: 10px;
+    min-height: 50px;
   }
 
-  @media (max-height: 500px) and (orientation: landscape) {
+  @media (max-height: 600px) and (orientation: landscape) {
     padding: 4px 6px;
     border-radius: 6px;
+    min-height: 50px;
   }
 
   @media (max-width: 480px) and (orientation: landscape) {
     padding: 3px 4px;
     border-radius: 4px;
+    min-height: 45px;
   }
 `;
 
 export const HandCardsLabel = styled.div`
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(0, 0, 0, 0.6);
   font-size: 12px;
   margin-bottom: 10px;
   text-transform: uppercase;
@@ -612,7 +646,7 @@ export const HandCardsLabel = styled.div`
     content: '';
     flex: 1;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    background: linear-gradient(90deg, transparent, rgba(0,0,0,0.2), transparent);
   }
 `;
 
@@ -623,27 +657,33 @@ export const HandCardsList = styled.div`
   overflow-x: auto;
   overflow-y: hidden;
   white-space: nowrap;
-  min-height: 0;
+  min-height: 40px;
 
   @media (max-width: 768px) {
     gap: 2px;
     padding: 3px 0;
+    min-height: 35px;
   }
 
-  @media (max-height: 500px) and (orientation: landscape) {
+  @media (max-width: 480px) {
+    min-height: 30px;
+  }
+
+  @media (max-height: 600px) and (orientation: landscape) {
     gap: 1px;
     padding: 2px 0;
+    min-height: 30px;
   }
 
   &::-webkit-scrollbar {
     height: 4px;
   }
   &::-webkit-scrollbar-track {
-    background: rgba(255,255,255,0.1);
+    background: rgba(0,0,0,0.1);
     border-radius: 2px;
   }
   &::-webkit-scrollbar-thumb {
-    background: rgba(255,255,255,0.3);
+    background: rgba(0,0,0,0.3);
     border-radius: 2px;
   }
 `;
@@ -653,28 +693,39 @@ export const ControlsArea = styled.div`
   display: flex;
   gap: 12px;
   padding: 15px 25px;
-  background: linear-gradient(180deg, rgba(20, 20, 40, 0.9) 0%, rgba(10, 10, 30, 0.95) 100%);
+  background: transparent;
   border-radius: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(20px);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+  border: none;
+  backdrop-filter: none;
+  box-shadow: none;
+  flex-shrink: 0;
 
   @media (max-width: 768px) {
     gap: 8px;
     padding: 10px 15px;
     border-radius: 14px;
+    min-height: 44px;
   }
 
   @media (max-width: 480px) {
     gap: 6px;
     padding: 8px 10px;
     border-radius: 10px;
+    min-height: 40px;
   }
 
-  @media (max-height: 500px) and (orientation: landscape) {
-    gap: 3px;
-    padding: 4px 6px;
+  @media (max-height: 600px) and (orientation: landscape) {
+    gap: 4px;
+    padding: 4px 8px;
     border-radius: 6px;
+    min-height: 36px;
+  }
+
+  @media (max-width: 480px) and (orientation: landscape) {
+    gap: 3px;
+    padding: 3px 6px;
+    border-radius: 5px;
+    min-height: 32px;
   }
 
   @media (max-width: 480px) and (orientation: landscape) {
@@ -838,15 +889,6 @@ const toastSlideIn = keyframes`
   100% {
     transform: translateX(-50%) translateY(-100px);
     opacity: 0;
-  }
-`;
-
-const toastPulse = keyframes`
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(78, 205, 196, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 0 10px rgba(78, 205, 196, 0);
   }
 `;
 
