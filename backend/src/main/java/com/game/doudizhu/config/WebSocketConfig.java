@@ -13,8 +13,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws/game")
-                .setAllowedOriginPatterns("http://localhost:*", "http://127.0.0.1:*", "https://*")  // More secure origin patterns
-                .withSockJS(); // Fallback for older browsers
+                .setAllowedOriginPatterns("http://localhost:*", "http://127.0.0.1:*", "https://*")
+                .withSockJS();
     }
 
     @Override
@@ -27,5 +27,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
         // Set user-specific destination prefix
         registry.setUserDestinationPrefix("/user");
+    }
+
+    @Override
+    public void configureClientInboundChannel(org.springframework.messaging.simp.config.ChannelRegistration registration) {
+        registration.interceptors(new WebSocketChannelInterceptor());
     }
 }
