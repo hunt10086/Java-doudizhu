@@ -119,7 +119,24 @@ npm run build
 - **Farmer (农民)**: Green badge displayed on non-landlord players after landlord is determined
 - Identity is determined by comparing playerId with landlordId in game state
 
+### Game End Display (WinnerDisplay.js)
+- Winner overlay with confetti animation
+- Shows winner name and result (landlord/farmer wins)
+- "再来一局" button only visible to host
+- Delayed display (1 second after game ends)
+- Close button available to dismiss
+
+### Card Effect Display (GameEffects.js)
+- CardEffectDisplay shows played card type (顺子, 炸弹, 王炸, etc.)
+- Position: displays above the played cards area
+- EffectContainer positioned at 35% from top for better visibility
+
 ## Common Development Tasks
+
+### Handling GAME_START Event
+- In App.js MessageHandler, GAME_START event with `status === 'WAITING'` and no `roomId` triggers room manager display
+- This handles initial game creation case, not playing state updates
+- Be careful when checking for roomId to avoid incorrectly showing room manager during gameplay
 
 ### Adding a new game event
 1. Add to `GameEvent.EventType` enum in backend
