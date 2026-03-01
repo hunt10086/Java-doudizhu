@@ -1,7 +1,5 @@
 server:
   port: 8118
-  servlet:
-    context-path: /api
 
 spring:
   application:
@@ -10,9 +8,9 @@ spring:
   # Database configuration
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/doudizhu?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
-    username: root
-    password: 123456
+    url: jdbc:mysql://localhost:3306/ddz?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ddz
+    password: cCjANasc75Bx2y4N
 
 logging:
   level:

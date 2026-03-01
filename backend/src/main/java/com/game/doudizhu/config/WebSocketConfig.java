@@ -12,8 +12,11 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // 后端 context-path: /api，所以 /ws/game 实际是 /api/ws/game
+        // Nginx: location /api/ws { proxy_pass http://localhost:8118; }
+        // 转发后：/api/ws/game → /api/ws/game ✓
         registry.addEndpoint("/ws/game")
-                .setAllowedOriginPatterns("http://localhost:*", "http://127.0.0.1:*", "https://*")
+                .setAllowedOriginPatterns("*")
                 .withSockJS();
     }
 

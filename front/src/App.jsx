@@ -10,7 +10,7 @@ import { GameProvider, useGame } from './contexts/GameContext';
 import RoomManager from './components/RoomManager';
 import Auth from './components/Auth';
 import OrientationLock from './components/OrientationLock';
-import axios from './utils/axiosConfig';
+import axios from './utils/myaxios';
 import WinnerDisplay from './components/WinnerDisplay';
 import {
   GameBackground,
@@ -33,8 +33,6 @@ import { CardUtils, CardType } from './utils/gameLogic';
 
 // Global styles
 const GlobalStyle = createGlobalStyle`
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&display=swap');
-
   * {
     margin: 0;
     padding: 0;
@@ -42,7 +40,7 @@ const GlobalStyle = createGlobalStyle`
   }
 
   body {
-    font-family: 'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
     overflow: hidden;
     -webkit-overflow-scrolling: touch;
   }
@@ -569,7 +567,7 @@ function App() {
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
-        const response = await axios.get('/api/auth/check');
+        const response = await axios.get('auth/check');
         if (response.data.loggedIn) {
           setUserInfo({
             userId: response.data.userId,

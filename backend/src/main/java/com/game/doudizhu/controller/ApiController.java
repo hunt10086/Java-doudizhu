@@ -7,8 +7,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api")
-@CrossOrigin(origins = "*", maxAge = 3600) // Additional annotation for API endpoints
+@RequestMapping("/")
+@CrossOrigin(origins = "*", allowCredentials = "false", maxAge = 3600)
 public class ApiController {
 
     @GetMapping("/health")

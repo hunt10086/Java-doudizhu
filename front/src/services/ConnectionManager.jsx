@@ -14,11 +14,11 @@ class ConnectionManager {
 
   connect(playerId, onConnected, onError) {
     this.playerId = playerId;
-    console.log('Connecting to WebSocket server:', `${WS_BASE_URL}/ws/game`);
+    console.log('Connecting to WebSocket server:', `${WS_BASE_URL}/api/ws/game`);
 
     // Use SockJS and STOMP
     this.client = new Client({
-      webSocketFactory: () => new SockJS(`${WS_BASE_URL}/ws/game`),
+      webSocketFactory: () => new SockJS(`${WS_BASE_URL}/api/ws/game`),
       reconnectDelay: 5000,
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,

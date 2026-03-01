@@ -11,12 +11,12 @@ const ApiTestComponent = () => {
     const fetchApiData = async () => {
       try {
         // Fetch health status
-        const healthResponse = await fetch(`${API_BASE_URL}/api/health`);
+        const healthResponse = await fetch(`${API_BASE_URL}/health`);
         const healthData = await healthResponse.json();
         setHealthStatus(healthData);
 
         // Fetch config
-        const configResponse = await fetch(`${API_BASE_URL}/api/config`);
+        const configResponse = await fetch(`${API_BASE_URL}/config`);
         const configData = await configResponse.json();
         setConfig(configData);
       } catch (err) {

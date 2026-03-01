@@ -11,7 +11,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/auth")
 public class AuthController {
 
     @Autowired
@@ -29,8 +29,8 @@ public class AuthController {
         if (username == null || username.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "用户名不能为空"));
         }
-        if (username.length() < 3 || username.length() > 20) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "用户名长度需在3-20个字符之间"));
+        if (username.length() > 64) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "用户名长度不能超过64个字符"));
         }
         if (!username.matches("^[a-zA-Z0-9_]+$")) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "用户名只能包含字母、数字和下划线"));
@@ -38,11 +38,14 @@ public class AuthController {
         if (password == null || password.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "密码不能为空"));
         }
-        if (password.length() < 6 || password.length() > 50) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "密码长度需在6-50个字符之间"));
+        if (password.length() < 6 || password.length() > 64) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "密码长度需在6-64个字符之间"));
         }
-        if (nickname != null && nickname.length() > 20) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "昵称长度不能超过20个字符"));
+        if (!password.matches("^[a-zA-Z0-9_]+$")) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "密码只能包含字母、数字和下划线"));
+        }
+        if (nickname != null && nickname.length() > 64) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "昵称长度不能超过64个字符"));
         }
 
         Map<String, Object> result = userService.register(username, password, nickname);
