@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import styled, { createGlobalStyle, keyframes } from 'styled-components';
 import GameTable from './components/GameTable';
 import GameControls from './components/GameControls';
@@ -247,7 +248,7 @@ const HandCard = styled.div`
 `;
 
 // Message handler component
-const MessageHandler = ({ onGameStart, showToast }) => {
+const MessageHandler = ({ onGameStart, onGameJoined, showToast }) => {
   const { state, dispatch } = useGame();
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -310,6 +311,25 @@ const MessageHandler = ({ onGameStart, showToast }) => {
               }
               if (data.data.currentPlayerId) {
                 dispatch({ type: 'SET_CURRENT_PLAYER', payload: { id: data.data.currentPlayerId } });
+              }
+              if (data.data.playerCardCounts) {
+                dispatch({ type: 'SET_PLAYER_CARD_COUNTS', payload: data.data.playerCardCounts });
+              }
+              if (data.data.playerLandlordStatus) {
+                // Update players with landlord status
+                const currentPlayers = state.players || [];
+                const updatedPlayers = currentPlayers.map(p => ({
+                  ...p,
+                  isLandlord: data.data.playerLandlordStatus[p.id] || false
+                }));
+                dispatch({ type: 'SET_PLAYERS', payload: updatedPlayers });
+              }
+              if (data.data.gameStatus) {
+                dispatch({ type: 'SET_GAME_STATE', payload: data.data.gameStatus.toLowerCase() });
+              }
+              // If reconnected and game is in progress, hide room manager and show game
+              if (data.data.gameStatus === 'BIDDING' || data.data.gameStatus === 'PLAYING') {
+                onGameJoined && onGameJoined();
               }
             }
           }
@@ -477,16 +497,36 @@ const MessageHandler = ({ onGameStart, showToast }) => {
           break;
 
         case 'PLAYER_DISCONNECT':
-          console.log('Player disconnected:', data.playerId, data.data);
+          console.log('Player disconnected or error:', data.playerId, data.data);
+          // 如果有错误消息，显示错误提示
+          if (data.data) {
+            showToast(data.data, 'error');
+            // 如果是加入游戏失败，返回房间界面
+            if (data.data.includes('Error joining game')) {
+              onGameStart && onGameStart();
+            }
+          }
           break;
 
         case 'GAME_DESTROYED':
           // 房间被解散（房主离开或所有玩家离开）
           console.log('Game destroyed:', data.data);
-          // 显示提示并让用户返回房间等待界面
           showToast(data.data || '房间已解散', 'error');
-          // 触发返回房间界面
+          ConnectionManager.disconnect();
+          window.dispatchEvent(new Event('returnToRoomManager'));
           onGameStart && onGameStart();
+          break;
+
+        case 'ERROR':
+          // 后端返回的错误消息
+          console.log('Error from server:', data.data);
+          if (data.data) {
+            showToast(String(data.data), 'error');
+            // 如果是加入游戏失败，返回房间界面
+            if (String(data.data).includes('Error joining game')) {
+              onGameStart && onGameStart();
+            }
+          }
           break;
 
         case 'PLAYER_RECONNECT':
@@ -500,6 +540,33 @@ const MessageHandler = ({ onGameStart, showToast }) => {
             // Set turn start time to current timestamp
             dispatch({ type: 'SET_TURN_START_TIME', payload: Date.now() });
             console.log('Turn started for player:', data.playerId);
+          }
+          break;
+
+        case 'PLAYER_LEAVE':
+          // 处理玩家离开房间的错误（如游戏中无法离开）
+          if (data.data && typeof data.data === 'string') {
+            console.log('Player leave error:', data.data);
+            if (showToast) {
+              showToast(data.data, 'error');
+            }
+          }
+          break;
+
+        case 'PLAYER_OFFLINE':
+          // 处理玩家离线事件
+          console.log('Player offline:', data.data);
+          if (data.data && data.data.playerId) {
+            dispatch({
+              type: 'SET_PLAYER_OFFLINE',
+              payload: {
+                playerId: data.data.playerId,
+                isOffline: data.data.isOffline
+              }
+            });
+            if (showToast) {
+              showToast(`${data.data.playerName || '玩家'} 已离线`, 'info');
+            }
           }
           break;
 
@@ -536,16 +603,8 @@ const ScreenShakeEffect = () => {
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [showRoomManager, setShowRoomManager] = useState(true);
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState(null);
-
-  // Show toast notification
-  const showToast = (message, type = 'info') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
 
   const initialGameState = {
     players: [],
@@ -560,7 +619,7 @@ function App() {
     handCards: [],
     selectedCards: [],
     playerCardCounts: {},
-    currentEffect: null  // For displaying card type effects
+    currentEffect: null
   };
 
   // 检查登录状态
@@ -576,20 +635,6 @@ function App() {
             score: response.data.score
           });
           setIsLoggedIn(true);
-
-          // Check for saved game state in localStorage
-          const savedGameState = localStorage.getItem('doudizhu_gameState');
-          if (savedGameState) {
-            try {
-              const gameState = JSON.parse(savedGameState);
-              console.log('Found saved game state:', gameState);
-              // If there's a saved game state, we can try to reconnect
-              // But for now, we'll let user manually rejoin
-            } catch (e) {
-              console.error('Failed to parse saved game state:', e);
-              localStorage.removeItem('doudizhu_gameState');
-            }
-          }
         }
       } catch (error) {
         console.error('检查登录状态失败:', error);
@@ -606,71 +651,184 @@ function App() {
     setIsLoggedIn(true);
   };
 
+  if (loading) {
+    return (
+      <LoadingContainer>
+        <LoadingText>加载中...</LoadingText>
+      </LoadingContainer>
+    );
+  }
+
   return (
-    <GameProvider initialState={initialGameState}>
-      <GlobalStyle />
-      <OrientationLock />
-      <MessageHandler onGameStart={() => setShowRoomManager(true)} showToast={showToast} />
-      {loading ? (
-        <LoadingContainer>
-          <LoadingText>加载中...</LoadingText>
-        </LoadingContainer>
-      ) : !isLoggedIn ? (
-        <Auth onLoginSuccess={handleLoginSuccess} />
-      ) : showRoomManager ? (
-        <RoomManager
-          onGameStart={() => setShowRoomManager(false)}
-          userInfo={userInfo}
-        />
-      ) : (
-        <AppContainer>
-          <ScreenShakeEffect />
-          <GameBackground />
-          <GameLayout>
-            <TopBar>
-              <GameInfo />
-            </TopBar>
-
-            <MainArea>
-              <GameArea>
-                <GameTable />
-                <CardEffectDisplay />
-              </GameArea>
-
-              <SidePanel>
-                <ChatPanel />
-              </SidePanel>
-            </MainArea>
-
-            <BottomArea>
-              <HandCardsArea>
-                <div style={{ display: 'flex', alignItems: 'center' }}>
-                  <HandCardsLabel>您的手牌</HandCardsLabel>
-                  <BottomTimer />
-                </div>
-                <HandCardsList>
-                  <CardContent />
-                </HandCardsList>
-              </HandCardsArea>
-              <ControlsArea>
-                <GameControls />
-              </ControlsArea>
-            </BottomArea>
-          </GameLayout>
-          <WinnerOverlayContent showToast={showToast} onShowRoomManager={() => setShowRoomManager(true)} />
-          {toast && (
-            <ToastContainer>
-              <Toast $type={toast.type}>
-                <ToastIcon>{toast.type === 'success' ? '✓' : toast.type === 'error' ? '✗' : 'ℹ'}</ToastIcon>
-                <ToastMessage>{toast.message}</ToastMessage>
-              </Toast>
-            </ToastContainer>
-          )}
-        </AppContainer>
-      )}
-    </GameProvider>
+    <BrowserRouter>
+      <GameProvider initialState={initialGameState}>
+        <GlobalStyle />
+        <OrientationLock />
+        {isLoggedIn ? (
+          <Routes>
+            <Route path="/" element={<RoomManager userInfo={userInfo} />} />
+            <Route path="/room" element={<RoomManager userInfo={userInfo} />} />
+            <Route path="/game" element={<GamePage />} />
+          </Routes>
+        ) : (
+          <Auth onLoginSuccess={handleLoginSuccess} />
+        )}
+      </GameProvider>
+    </BrowserRouter>
   );
 }
+
+// Game page component with its own state
+function GamePage() {
+  const { state, dispatch } = useGame();
+  const navigate = useNavigate();
+  const [toast, setToast] = useState(null);
+  const [isReconnecting, setIsReconnecting] = useState(false);
+
+  // Listen for connection status changes
+  useEffect(() => {
+    const handleConnectionChange = (status) => {
+      setIsReconnecting(status === 'disconnected');
+    };
+    ConnectionManager.addConnectionListener(handleConnectionChange);
+    return () => ConnectionManager.removeConnectionListener(handleConnectionChange);
+  }, []);
+
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // Warn before leaving page during active game
+  useEffect(() => {
+    const handler = (e) => {
+      if (state.gameState === 'playing' || state.gameState === 'bidding') {
+        e.preventDefault();
+        e.returnValue = '游戏正在进行中，确定要离开吗？';
+        return e.returnValue;
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [state.gameState]);
+
+  // Handle leave room
+  const handleLeaveRoom = () => {
+    if (window.confirm('确定要退出房间吗？退出后其他人可以看到您已离线。')) {
+      console.log('Leaving room...');
+      ConnectionManager.leaveGame();
+      ConnectionManager.disconnect();
+      // Reset game state
+      dispatch({ type: 'SET_GAME_STATE', payload: 'waiting' });
+      dispatch({ type: 'SET_PLAYERS', payload: [] });
+      dispatch({ type: 'SET_HAND_CARDS', payload: [] });
+      dispatch({ type: 'SET_CURRENT_CARDS', payload: [] });
+      dispatch({ type: 'SET_LANDLORD', payload: null });
+      dispatch({ type: 'SET_LANDLORD_CARDS', payload: [] });
+      // Emit event to notify RoomManager to reconnect
+      window.dispatchEvent(new Event('returnToRoomManager'));
+      // Navigate to room page
+      navigate('/room');
+    }
+  };
+
+  return (
+    <>
+      <MessageHandler
+        onGameStart={() => navigate('/room')}
+        onGameJoined={() => {}}
+        showToast={showToast}
+      />
+      <AppContainer>
+        <ScreenShakeEffect />
+        <GameBackground />
+        <GameLayout>
+          <TopBar>
+            <GameInfo />
+            <ExitButton onClick={handleLeaveRoom}>退出</ExitButton>
+          </TopBar>
+
+          <MainArea>
+            <GameArea>
+              <GameTable />
+              <CardEffectDisplay />
+            </GameArea>
+
+            <SidePanel>
+              <ChatPanel />
+            </SidePanel>
+          </MainArea>
+
+          <BottomArea>
+            <HandCardsArea>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <HandCardsLabel>您的手牌</HandCardsLabel>
+                <BottomTimer />
+              </div>
+              <HandCardsList>
+                <CardContent />
+              </HandCardsList>
+            </HandCardsArea>
+            <ControlsArea>
+              <GameControls onLeaveRoom={handleLeaveRoom} />
+            </ControlsArea>
+          </BottomArea>
+        </GameLayout>
+        <WinnerOverlayContent showToast={showToast} onShowRoomManager={() => navigate('/room')} />
+        {isReconnecting && <ReconnectingToast>正在重连服务器...</ReconnectingToast>}
+        {toast && (
+          <ToastContainer>
+            <Toast $type={toast.type}>
+              <ToastIcon>{toast.type === 'success' ? '✓' : toast.type === 'error' ? '✗' : 'ℹ'}</ToastIcon>
+              <ToastMessage>{toast.message}</ToastMessage>
+            </Toast>
+          </ToastContainer>
+        )}
+      </AppContainer>
+    </>
+  );
+}
+
+const ExitButton = styled.button`
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(235, 51, 73, 0.4);
+  }
+`;
+
+const pulseAnim = keyframes`
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+`;
+
+const ReconnectingToast = styled.div`
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(231, 76, 60, 0.9);
+  color: white;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  backdrop-filter: blur(10px);
+  animation: ${pulseAnim} 1s ease-in-out infinite;
+`;
 
 const LoadingContainer = styled.div`
   width: 100vw;
@@ -819,6 +977,8 @@ const WinnerOverlayContent = ({ showToast, onShowRoomManager }) => {
     console.log('Leave room clicked from WinnerDisplay');
     // 调用后端离开房间
     ConnectionManager.leaveGame();
+    // 断开 WebSocket 连接
+    ConnectionManager.disconnect();
     // 重置游戏状态并返回房间等待界面
     dispatch({ type: 'SET_WINNER', payload: null });
     dispatch({ type: 'SET_GAME_STATE', payload: 'waiting' });
@@ -827,6 +987,8 @@ const WinnerOverlayContent = ({ showToast, onShowRoomManager }) => {
     dispatch({ type: 'SET_CURRENT_CARDS', payload: [] });
     dispatch({ type: 'SET_LANDLORD', payload: null });
     dispatch({ type: 'SET_LANDLORD_CARDS', payload: [] });
+    // 触发返回房间界面事件
+    window.dispatchEvent(new Event('returnToRoomManager'));
     // 触发返回房间界面
     onShowRoomManager && onShowRoomManager();
   };

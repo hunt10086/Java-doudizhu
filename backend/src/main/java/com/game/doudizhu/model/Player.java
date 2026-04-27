@@ -11,6 +11,7 @@ public class Player {
     private List<Card> hand;
     private boolean isActive;
     private int score;
+    private boolean isOffline;  // 玩家是否已离线
 
     // Constructors
     public Player() {}
@@ -48,4 +49,7 @@ public class Player {
 
     public int getScore() { return score; }
     public void setScore(int score) { this.score = score; }
+
+    public boolean isOffline() { return isOffline; }
+    public void setOffline(boolean offline) { isOffline = offline; }
 }

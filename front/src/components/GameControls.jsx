@@ -212,7 +212,7 @@ const StatusMessage = styled.div`
   }
 `;
 
-const GameControls = () => {
+const GameControls = ({ onLeaveRoom }) => {
   const { state, dispatch } = useGame();
 
   // Get my player ID from connection manager (more reliable)

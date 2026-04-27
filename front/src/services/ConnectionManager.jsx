@@ -8,6 +8,7 @@ class ConnectionManager {
     this.connected = false;
     this.subscriptions = [];
     this.onMessageCallbacks = [];
+    this.onConnectionChangeCallbacks = [];
     this.playerId = null;
     this.gameId = null;
   }
@@ -16,18 +17,36 @@ class ConnectionManager {
     this.playerId = playerId;
     console.log('Connecting to WebSocket server:', `${WS_BASE_URL}/api/ws/game`);
 
-    // Use SockJS and STOMP
     this.client = new Client({
       webSocketFactory: () => new SockJS(`${WS_BASE_URL}/api/ws/game`),
-      reconnectDelay: 5000,
+      reconnectDelay: [1000, 2000, 4000, 8000, 16000],
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
       onConnect: (frame) => {
         console.log('Connected to game server! Frame:', frame);
         this.connected = true;
+
+        // Clear any residual subscriptions from previous connection
+        this.subscriptions.forEach(sub => {
+          try { sub.unsubscribe(); } catch (e) { /* already gone */ }
+        });
+        this.subscriptions = [];
+
         console.log('Subscribing to game topics...');
         this.subscribeToGameTopics();
         console.log('Subscription complete. Connected:', this.connected);
+
+        this.notifyConnectionChange('connected');
+
+        // Auto-rejoin if we have saved room info in localStorage (STOMP reconnect after refresh)
+        const savedRoomId = localStorage.getItem("doudizhu_roomId");
+        const savedPlayerName = localStorage.getItem("doudizhu_playerName");
+        if (savedRoomId && savedPlayerName && !this.gameId) {
+          console.log('STOMP reconnected with saved room, auto-rejoining:', savedRoomId);
+          setTimeout(() => {
+            this.joinGame(savedRoomId, savedPlayerName);
+          }, 300);
+        }
 
         if (onConnected) {
           onConnected();
@@ -36,6 +55,7 @@ class ConnectionManager {
       onStompError: (frame) => {
         console.error('STOMP error:', frame);
         this.connected = false;
+        this.notifyConnectionChange('error');
         if (onError) {
           onError(frame);
         }
@@ -49,16 +69,30 @@ class ConnectionManager {
       onDisconnect: () => {
         console.log('Disconnected from game server');
         this.connected = false;
+        this.notifyConnectionChange('disconnected');
       }
     });
 
     this.client.activate();
   }
 
+  // Connection status tracking
+  addConnectionListener(callback) {
+    this.onConnectionChangeCallbacks.push(callback);
+  }
+
+  removeConnectionListener(callback) {
+    this.onConnectionChangeCallbacks = this.onConnectionChangeCallbacks.filter(cb => cb !== callback);
+  }
+
+  notifyConnectionChange(status) {
+    this.onConnectionChangeCallbacks.forEach(cb => cb(status));
+  }
+
   subscribeToGameTopics() {
     console.log('=== subscribeToGameTopics called, gameId:', this.gameId, 'connected:', this.connected);
 
-    // Subscribe to private queue for this player (always needed for game creation/join responses)
+    // Subscribe to private queue for this player
     const privateSubscription = this.client.subscribe(
       `/user/queue/private`,
       (message) => {
@@ -87,7 +121,6 @@ class ConnectionManager {
     }
 
     console.log('Subscribing to game topic:', `/topic/game/${this.gameId}`);
-    // Subscribe to game topic
     const gameSubscription = this.client.subscribe(
       `/topic/game/${this.gameId}`,
       (message) => {
@@ -116,7 +149,6 @@ class ConnectionManager {
     this.gameId = gameId;
 
     if (this.connected) {
-      // Re-subscribe with new game ID
       console.log('Re-subscribing to game topics...');
       this.subscriptions.forEach(sub => sub.unsubscribe());
       this.subscriptions = [];
@@ -152,60 +184,28 @@ class ConnectionManager {
 
     console.log('Subscribing to:', topic);
 
-    // Subscribe to creation response topic
     const createdSubscription = this.client.subscribe(
       topic,
       (message) => {
         console.log('Received message on created topic:', message.body);
         const data = JSON.parse(message.body);
         console.log('Game created response:', data);
-        // After receiving game ID, switch to game topic
         if (data.data && data.data.gameId) {
-          // Subscribe to game topic to receive broadcasts from other players
           this.setGameId(data.data.gameId);
         }
         this.handleMessage(data);
-        // Unsubscribe from creation topic
         createdSubscription.unsubscribe();
       }
     );
 
-    // Wait a bit for subscription to be established, then send the message
     setTimeout(() => {
       console.log('Sending create request after subscription');
-      // playerName should be in 'data' field for backend GameEvent
       this.sendMessage('/app/game/create', {
         playerId: playerId,
         gameId: null,
         data: playerName
       });
     }, 500);
-  }
-
-  // Helper method to subscribe to game topic immediately
-  subscribeToGameTopic(gameId) {
-    if (!this.client || !this.connected) {
-      console.warn('Cannot subscribe: not connected');
-      return;
-    }
-
-    // Check if already subscribed to this topic
-    const existingSub = this.subscriptions.find(sub => sub.topic === `/topic/game/${gameId}`);
-    if (existingSub) {
-      console.log('Already subscribed to game topic:', gameId);
-      return;
-    }
-
-    console.log('Subscribing to game topic:', `/topic/game/${gameId}`);
-    const gameSubscription = this.client.subscribe(
-      `/topic/game/${gameId}`,
-      (message) => {
-        console.log('=== Received on game topic:', message.body);
-        const data = JSON.parse(message.body);
-        this.handleMessage(data);
-      }
-    );
-    this.subscriptions.push(gameSubscription);
   }
 
   // Join an existing game
@@ -219,13 +219,11 @@ class ConnectionManager {
         const data = JSON.parse(message.body);
         console.log('Game joined response:', data);
         this.handleMessage(data);
-        // Unsubscribe from join topic
         joinedSubscription.unsubscribe();
       }
     );
 
-    // IMPORTANT: Subscribe to game topic IMMEDIATELY to receive broadcasts
-    // This ensures we can receive PLAYER_JOIN broadcasts from other players
+    // Subscribe to game topic IMMEDIATELY to receive broadcasts
     this.gameId = gameId;
     if (this.connected) {
       console.log('Subscribing to game topic immediately for join:', `/topic/game/${gameId}`);
@@ -240,9 +238,7 @@ class ConnectionManager {
       this.subscriptions.push(gameSubscription);
     }
 
-    // Wait a bit for subscription to be established, then send the message
     setTimeout(() => {
-      // playerName should be in 'data' field for backend GameEvent
       this.sendMessage('/app/game/join', {
         playerId: playerId,
         gameId: gameId,
@@ -311,7 +307,6 @@ class ConnectionManager {
   }
 
   handleMessage(data) {
-    // Notify all registered callbacks
     this.onMessageCallbacks.forEach(callback => callback(data));
   }
 
@@ -323,7 +318,6 @@ class ConnectionManager {
     this.onMessageCallbacks = this.onMessageCallbacks.filter(cb => cb !== callback);
   }
 
-  // Attempt to reconnect to an existing game
   reconnect(playerId, gameId) {
     console.log('Sending reconnect request for game:', gameId, 'player:', playerId);
     this.sendMessage('/app/game/reconnect', {
@@ -334,11 +328,14 @@ class ConnectionManager {
 
   disconnect() {
     if (this.client) {
-      this.subscriptions.forEach(sub => sub.unsubscribe());
+      this.subscriptions.forEach(sub => {
+        try { sub.unsubscribe(); } catch (e) { /* ignore */ }
+      });
       this.subscriptions = [];
       this.client.deactivate();
       this.client = null;
       this.connected = false;
+      this.gameId = null;
     }
   }
 

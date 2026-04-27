@@ -12,11 +12,17 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
 public class GameService {
+
+    private static final Logger log = LoggerFactory.getLogger(GameService.class);
 
     // Card type enumeration
     private enum CardType {
@@ -46,6 +52,10 @@ public class GameService {
     private final Map<String, java.util.concurrent.ScheduledFuture<?>> turnTimeoutTasks = new ConcurrentHashMap<>();
     private final SecureRandom random = new SecureRandom();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
+
+    // Disconnect grace period: "gameId:playerId" -> removal task
+    private final Map<String, ScheduledFuture<?>> disconnectGraceTasks = new ConcurrentHashMap<>();
+    private static final long DISCONNECT_GRACE_PERIOD_SECONDS = 30;
 
     /**
      * Create a new game room
@@ -132,15 +142,91 @@ public class GameService {
             throw new RuntimeException("Game not found: " + gameId);
         }
 
-        if (gameState.getPlayers().size() >= 3) {
-            throw new RuntimeException("Game is full: " + gameId);
-        }
-
-        // 检查该playerId是否已在本游戏中（防止同一用户重复加入）
+        // 检查该playerId是否已在本游戏中
+        // 如果玩家已存在，检查是否可以从断连中恢复
+        // 优先处理重连情况，这样玩家刷新后可以重新加入
         for (Player existingPlayer : gameState.getPlayers()) {
             if (existingPlayer.getId().equals(playerId)) {
-                throw new RuntimeException("您已在该房间中");
+                // Player already exists - this is likely a reconnection after page refresh
+                // Update player name and return success
+                log.info("Player reconnected: {} in game {}", playerId, gameId);
+                existingPlayer.setName(playerName);
+                existingPlayer.setOffline(false);
+
+                // Cancel any pending disconnect removal task
+                String taskKey = gameState.getGameId() + ":" + playerId;
+                ScheduledFuture<?> removalTask = disconnectGraceTasks.remove(taskKey);
+                if (removalTask != null) {
+                    removalTask.cancel(false);
+                    log.info("Cancelled disconnect removal for reconnected player: {}", playerId);
+                }
+
+                // Send reconnection success event with full game state
+                Map<String, Object> roomInfo = new HashMap<>();
+                roomInfo.put("gameId", gameState.getGameId());
+                roomInfo.put("roomId", gameState.getRoomId());
+                roomInfo.put("players", getBasicPlayerInfo(gameState.getPlayers()));
+                roomInfo.put("status", gameState.getStatus().name());
+                roomInfo.put("isHost", existingPlayer.isHost());
+                roomInfo.put("reconnected", true);
+
+                // Add full game state for reconnection
+                if (gameState.getStatus() == GameState.Status.PLAYING ||
+                    gameState.getStatus() == GameState.Status.BIDDING) {
+                    roomInfo.put("currentPlayerId", gameState.getCurrentPlayerId());
+                    roomInfo.put("landlordId", gameState.getLandlordId());
+                    roomInfo.put("lastPlayerId", gameState.getLastPlayerId());
+                    roomInfo.put("turnStartTime", gameState.getTurnStartTime());
+                    roomInfo.put("gameStatus", gameState.getStatus().name());
+
+                    // Add landlord cards (visible to all)
+                    if (gameState.getLandlordCards() != null) {
+                        roomInfo.put("landlordCards", gameState.getLandlordCards());
+                    }
+
+                    // Add current cards on table (if any)
+                    if (gameState.getCurrentCards() != null && !gameState.getCurrentCards().isEmpty()) {
+                        roomInfo.put("currentCards", gameState.getCurrentCards());
+                    }
+
+                    // Add current player's hand cards for reconnection
+                    roomInfo.put("handCards", existingPlayer.getHand());
+
+                    // Add all players' hand for card count display
+                    Map<String, Integer> playerCardCounts = new HashMap<>();
+                    Map<String, Boolean> playerLandlordStatus = new HashMap<>();
+                    for (Player p : gameState.getPlayers()) {
+                        playerCardCounts.put(p.getId(), p.getHand() != null ? p.getHand().size() : 0);
+                        playerLandlordStatus.put(p.getId(), p.isLandlord());
+                    }
+                    roomInfo.put("playerCardCounts", playerCardCounts);
+                    roomInfo.put("playerLandlordStatus", playerLandlordStatus);
+                }
+
+                GameEvent joinEvent = new GameEvent(
+                    GameEvent.EventType.PLAYER_JOIN,
+                    gameState.getGameId(),
+                    playerId,
+                    roomInfo
+                );
+                messagingTemplate.convertAndSend("/topic/game/joined_" + playerId, joinEvent);
+
+                // Also broadcast reconnection to other players
+                GameEvent reconnectEvent = new GameEvent(
+                    GameEvent.EventType.PLAYER_JOIN,
+                    gameState.getGameId(),
+                    playerId,
+                    existingPlayer
+                );
+                messagingTemplate.convertAndSend("/topic/game/" + gameState.getGameId(), reconnectEvent);
+
+                return gameState;
             }
+        }
+
+        // 新玩家加入 - 检查房间是否已满
+        if (gameState.getPlayers().size() >= 3) {
+            throw new RuntimeException("Game is full: " + gameId);
         }
 
         // Add player to game
@@ -149,7 +235,7 @@ public class GameService {
 
         // Use the actual gameId from GameState for broadcasting (not the incoming roomId)
         String broadcastGameId = gameState.getGameId();
-        System.out.println("=== Broadcasting PLAYER_JOIN to /topic/game/" + broadcastGameId);
+        log.debug("=== Broadcasting PLAYER_JOIN to /topic/game/{}", broadcastGameId);
 
         // Broadcast player joined event
         GameEvent joinEvent = new GameEvent(
@@ -490,6 +576,7 @@ public class GameService {
     /**
      * Handle player leaving the game
      * Returns true if player successfully left, false if game was destroyed (host left)
+     * Allows leaving during game - player will be marked as offline and AI will play for them
      */
     public boolean leaveGame(String gameId, String playerId) {
         GameState gameState = null;
@@ -525,43 +612,325 @@ public class GameService {
             return true; // Player not in game
         }
 
-        // Check if game is in progress (cannot leave while playing)
-        if (gameState.getStatus() == GameState.Status.PLAYING ||
-            gameState.getStatus() == GameState.Status.BIDDING ||
-            gameState.getStatus() == GameState.Status.DEALING) {
-            // Cannot leave while game is in progress - for normal leave requests
-            return false;
+        // Check if game is in waiting state (can leave freely)
+        if (gameState.getStatus() == GameState.Status.WAITING) {
+            // Check if the leaving player is the host
+            boolean isHost = leavingPlayer.isHost();
+
+            // Remove player from game
+            gameState.getPlayers().remove(leavingPlayer);
+
+            // Broadcast player leave event
+            GameEvent leaveEvent = new GameEvent(
+                GameEvent.EventType.PLAYER_LEAVE,
+                broadcastGameId,
+                playerId,
+                leavingPlayer.getName()
+            );
+            messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, leaveEvent);
+
+            // Any player leaving destroys the room
+            // Destroy the game
+            activeGames.remove(broadcastGameId);
+
+            // Broadcast game destroyed event
+            GameEvent destroyEvent = new GameEvent(
+                GameEvent.EventType.GAME_DESTROYED,
+                broadcastGameId,
+                null,
+                "玩家离开，房间已解散"
+            );
+            messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, destroyEvent);
+
+            return true;
         }
 
-        // Check if the leaving player is the host
-        boolean isHost = leavingPlayer.isHost();
+        // Game is in progress (DEALING, BIDDING, PLAYING) - remove player so they can rejoin other games
+        log.info("=== Player leaving during game, removing player: {} ===", playerId);
 
         // Remove player from game
         gameState.getPlayers().remove(leavingPlayer);
 
-        // Broadcast player leave event
+        // Broadcast player leave event to other players
         GameEvent leaveEvent = new GameEvent(
             GameEvent.EventType.PLAYER_LEAVE,
             broadcastGameId,
             playerId,
-            leavingPlayer.getName()
+            leavingPlayer.getName() + " 离开了游戏"
         );
         messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, leaveEvent);
 
-        // Any player leaving destroys the room
-        // Destroy the game
-        activeGames.remove(broadcastGameId);
+        // Check if there are still enough players to continue the game
+        if (gameState.getPlayers().size() < 2) {
+            // Not enough players, destroy the game
+            log.info("=== Not enough players, destroying game: {} ===", broadcastGameId);
+            activeGames.remove(broadcastGameId);
 
-        // Broadcast game destroyed event
-        GameEvent destroyEvent = new GameEvent(
-            GameEvent.EventType.GAME_DESTROYED,
-            broadcastGameId,
-            null,
-            "玩家离开，房间已解散"
-        );
-        messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, destroyEvent);
+            GameEvent destroyEvent = new GameEvent(
+                GameEvent.EventType.GAME_DESTROYED,
+                broadcastGameId,
+                null,
+                "玩家离开，游戏无法继续"
+            );
+            messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, destroyEvent);
+        } else {
+            // Update player info and notify remaining players
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("players", getBasicPlayerInfo(gameState.getPlayers()));
+
+            GameEvent updateEvent = new GameEvent(
+                GameEvent.EventType.GAME_START,
+                broadcastGameId,
+                null,
+                updateData
+            );
+            messagingTemplate.convertAndSend("/topic/game/" + broadcastGameId, updateEvent);
+        }
 
         return true;
+    }
+
+    /**
+     * Handle offline player's turn - auto play cards or pass
+     */
+    private void handleOfflinePlayerTurn(String gameId, String playerId) {
+        GameState gameState = activeGames.get(gameId);
+        if (gameState == null) return;
+
+        // Check if it's still this player's turn
+        if (!playerId.equals(gameState.getCurrentPlayerId())) {
+            return; // Turn has changed
+        }
+
+        if (gameState.getStatus() == GameState.Status.BIDDING) {
+            // Auto bid - pass (不叫)
+            try {
+                processBid(gameId, playerId, false);
+            } catch (Exception e) {
+                log.warn("=== Offline player bid failed: {}", e.getMessage());
+            }
+        } else if (gameState.getStatus() == GameState.Status.PLAYING) {
+            // Auto play - try to find cards larger than opponent's, otherwise pass
+            Player player = gameState.getPlayers().stream()
+                .filter(p -> p.getId().equals(playerId))
+                .findFirst()
+                .orElse(null);
+
+            if (player == null || player.getHand() == null || player.getHand().isEmpty()) {
+                // Player has no cards, end game
+                return;
+            }
+
+            List<Card> prevCards = gameState.getCurrentCards();
+            boolean isFirstTurn = gameState.getLastPlayerId() == null ||
+                gameState.getLastPlayerId().equals(playerId);
+
+            // Use AI service to choose best cards
+            List<Card> cardsToPlay = aiService.chooseCardsToPlay(player, prevCards, isFirstTurn);
+
+            if (cardsToPlay != null && !cardsToPlay.isEmpty()) {
+                try {
+                    log.info("=== Offline player auto-playing: {}", cardsToPlay);
+                    playCards(gameId, playerId, cardsToPlay);
+                } catch (Exception e) {
+                    log.warn("=== Offline player auto-play failed: {}", e.getMessage());
+                    // Try to pass
+                    try {
+                        passTurn(gameId, playerId);
+                    } catch (Exception ex) {
+                        log.warn("=== Offline player auto-pass failed: {}", ex.getMessage());
+                    }
+                }
+            } else {
+                // No valid cards to play, pass
+                try {
+                    log.info("=== Offline player auto-passing (no valid cards) ===");
+                    passTurn(gameId, playerId);
+                } catch (Exception e) {
+                    log.warn("=== Offline player auto-pass failed: {}", e.getMessage());
+                }
+            }
+        }
+    }
+
+    /**
+     * Handle player disconnect (e.g., page refresh)
+     * Marks player as offline with a 30-second grace period.
+     * Player is only removed if they don't reconnect within the grace period.
+     */
+    public void handlePlayerDisconnect(String gameId, String playerId) {
+        GameState gameState = resolveGameState(gameId);
+        if (gameState == null) return;
+
+        Player disconnectingPlayer = findPlayer(gameState, playerId);
+        if (disconnectingPlayer == null) return;
+
+        log.info("Player disconnected: {} from game: {}, status: {}", playerId, gameState.getGameId(), gameState.getStatus());
+
+        // Mark as offline instead of removing immediately
+        disconnectingPlayer.setOffline(true);
+
+        // Broadcast offline status to other players
+        Map<String, Object> offlineData = new HashMap<>();
+        offlineData.put("playerId", playerId);
+        offlineData.put("playerName", disconnectingPlayer.getName());
+        offlineData.put("isOffline", true);
+
+        GameEvent offlineEvent = new GameEvent(
+            GameEvent.EventType.PLAYER_OFFLINE,
+            gameState.getGameId(),
+            playerId,
+            offlineData
+        );
+        messagingTemplate.convertAndSend("/topic/game/" + gameState.getGameId(), offlineEvent);
+
+        // Schedule removal after grace period
+        String taskKey = gameState.getGameId() + ":" + playerId;
+        ScheduledFuture<?> existing = disconnectGraceTasks.remove(taskKey);
+        if (existing != null) {
+            existing.cancel(false);
+        }
+
+        ScheduledFuture<?> removalTask = scheduler.schedule(() -> {
+            disconnectGraceTasks.remove(taskKey);
+            performPlayerRemoval(gameState.getGameId(), playerId);
+        }, DISCONNECT_GRACE_PERIOD_SECONDS, TimeUnit.SECONDS);
+
+        disconnectGraceTasks.put(taskKey, removalTask);
+    }
+
+    /**
+     * Resolve game state by gameId or roomId
+     */
+    private GameState resolveGameState(String gameId) {
+        if (gameId == null) return null;
+        if (gameId.startsWith("game_")) {
+            return activeGames.get(gameId);
+        }
+        for (GameState gs : activeGames.values()) {
+            if (gs.getRoomId() != null && gs.getRoomId().equalsIgnoreCase(gameId)) {
+                return gs;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Find a player in a game by playerId
+     */
+    private Player findPlayer(GameState gameState, String playerId) {
+        for (Player player : gameState.getPlayers()) {
+            if (player.getId().equals(playerId)) {
+                return player;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Remove a player after grace period expires (only if still offline)
+     */
+    private void performPlayerRemoval(String gameId, String playerId) {
+        GameState gameState = activeGames.get(gameId);
+        if (gameState == null) return;
+
+        Player player = findPlayer(gameState, playerId);
+        if (player == null) return;
+
+        // Only remove if still offline (avoid racing with reconnection)
+        if (!player.isOffline()) {
+            log.info("Player {} reconnected before removal, skipping removal", playerId);
+            return;
+        }
+
+        log.info("Grace period expired, removing player: {} from game: {}", playerId, gameId);
+        boolean wasHost = player.isHost();
+        boolean wasCurrentPlayer = playerId.equals(gameState.getCurrentPlayerId());
+        gameState.getPlayers().remove(player);
+
+        // Host migration: if removed player was host, assign to next remaining player
+        if (wasHost && !gameState.getPlayers().isEmpty()) {
+            gameState.getPlayers().get(0).setHost(true);
+            log.info("Host migrated to: {}", gameState.getPlayers().get(0).getId());
+        }
+
+        // Broadcast player leave event
+        GameEvent leaveEvent = new GameEvent(
+            GameEvent.EventType.PLAYER_LEAVE,
+            gameState.getGameId(),
+            playerId,
+            player.getName() + " 离开了游戏"
+        );
+        messagingTemplate.convertAndSend("/topic/game/" + gameState.getGameId(), leaveEvent);
+
+        // Check if game should be destroyed
+        if (gameState.getPlayers().size() < 2) {
+            // Cancel turn timeout
+            ScheduledFuture<?> turnTask = turnTimeoutTasks.remove(gameState.getGameId());
+            if (turnTask != null) turnTask.cancel(false);
+
+            activeGames.remove(gameState.getGameId());
+            GameEvent destroyEvent = new GameEvent(
+                GameEvent.EventType.GAME_DESTROYED,
+                gameState.getGameId(),
+                null,
+                "玩家离开，游戏无法继续"
+            );
+            messagingTemplate.convertAndSend("/topic/game/" + gameState.getGameId(), destroyEvent);
+        } else if (gameState.getStatus() == GameState.Status.WAITING) {
+            // WAITING state: update players, no turn management needed
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("players", getBasicPlayerInfo(gameState.getPlayers()));
+            GameEvent updateEvent = new GameEvent(
+                GameEvent.EventType.GAME_START,
+                gameState.getGameId(),
+                null,
+                updateData
+            );
+            messagingTemplate.convertAndSend("/topic/game/" + gameState.getGameId(), updateEvent);
+        } else {
+            // Game in progress: advance turn if removed player was current
+            if (wasCurrentPlayer) {
+                // Cancel old turn timeout
+                ScheduledFuture<?> turnTask = turnTimeoutTasks.remove(gameState.getGameId());
+                if (turnTask != null) turnTask.cancel(false);
+
+                // Advance to next player
+                String nextPlayerId = getNextPlayer(gameState, playerId);
+                gameState.setCurrentPlayerId(nextPlayerId);
+                gameState.setLastPlayerId(null);
+                gameState.setCurrentCards(null);
+                gameState.setTurnStartTime(System.currentTimeMillis());
+
+                // Send table cleared event (next player must play)
+                Map<String, Object> clearData = new HashMap<>();
+                clearData.put("playerId", nextPlayerId);
+                clearData.put("tableCleared", true);
+                clearData.put("mustPlay", true);
+                clearData.put("playerCardCounts", getPlayerCardCounts(gameState));
+                GameEvent clearEvent = new GameEvent(
+                    GameEvent.EventType.PLAY_CARDS,
+                    gameState.getGameId(),
+                    nextPlayerId,
+                    clearData
+                );
+                messagingTemplate.convertAndSend("/topic/game/" + gameState.getGameId(), clearEvent);
+
+                // Schedule new turn timeout
+                scheduleTurnTimeout(gameState.getGameId());
+            }
+
+            // Update player info
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("players", getBasicPlayerInfo(gameState.getPlayers()));
+            GameEvent updateEvent = new GameEvent(
+                GameEvent.EventType.GAME_START,
+                gameState.getGameId(),
+                null,
+                updateData
+            );
+            messagingTemplate.convertAndSend("/topic/game/" + gameState.getGameId(), updateEvent);
+        }
     }
 
     /**
@@ -576,9 +945,34 @@ public class GameService {
             info.put("position", player.getPosition());
             info.put("isHost", player.isHost());
             info.put("isLandlord", player.isLandlord());
+            info.put("isOffline", player.isOffline());
             basicInfo.add(info);
         }
         return basicInfo;
+    }
+
+    /**
+     * Get the next player ID in rotation after the given player
+     */
+    private String getNextPlayer(GameState gameState, String currentPlayerId) {
+        for (int i = 0; i < gameState.getPlayers().size(); i++) {
+            if (gameState.getPlayers().get(i).getId().equals(currentPlayerId)) {
+                int nextIndex = (i + 1) % gameState.getPlayers().size();
+                return gameState.getPlayers().get(nextIndex).getId();
+            }
+        }
+        return gameState.getPlayers().get(0).getId();
+    }
+
+    /**
+     * Get card counts for all players
+     */
+    private Map<String, Integer> getPlayerCardCounts(GameState gameState) {
+        Map<String, Integer> counts = new HashMap<>();
+        for (Player p : gameState.getPlayers()) {
+            counts.put(p.getId(), p.getHand() != null ? p.getHand().size() : 0);
+        }
+        return counts;
     }
 
     /**
@@ -680,7 +1074,7 @@ public class GameService {
                 return;
             }
 
-            System.out.println("=== Player timeout: " + currentPlayerId + " ===");
+            log.info("=== Player timeout: {} ===", currentPlayerId);
 
             // 判断是否是地主
             boolean isLandlord = currentPlayerId.equals(gs.getLandlordId());
@@ -706,10 +1100,10 @@ public class GameService {
                     cardsToPlay.add(minCard);
 
                     try {
-                        System.out.println("=== Landlord timeout auto-play: " + minCard);
+                        log.info("=== Landlord timeout auto-play: {}", minCard);
                         playCards(gameId, currentPlayerId, cardsToPlay);
                     } catch (Exception e) {
-                        System.out.println("=== Auto-play failed: " + e.getMessage());
+                        log.warn("=== Auto-play failed: {}", e.getMessage());
                         // 如果出牌失败，尝试不出
                         try {
                             passTurn(gameId, currentPlayerId);
@@ -721,10 +1115,10 @@ public class GameService {
             } else {
                 // 非地主：不出牌
                 try {
-                    System.out.println("=== Non-landlord timeout: auto pass");
+                    log.info("=== Non-landlord timeout: auto pass");
                     passTurn(gameId, currentPlayerId);
                 } catch (Exception e) {
-                    System.out.println("=== Auto pass failed: " + e.getMessage());
+                    log.warn("=== Auto pass failed: {}", e.getMessage());
                 }
             }
         }, 30, TimeUnit.SECONDS);

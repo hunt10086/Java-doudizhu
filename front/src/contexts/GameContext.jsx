@@ -111,6 +111,16 @@ function gameReducer(state, action) {
     case 'SET_TURN_START_TIME':
       // Set the turn start timestamp
       return { ...state, turnStartTime: action.payload };
+    case 'SET_PLAYER_OFFLINE':
+      // Mark a player as offline
+      // action.payload: { playerId: string, isOffline: boolean }
+      const offlineUpdate = action.payload;
+      const updatedPlayersWithOffline = state.players.map(player =>
+        player.id === offlineUpdate.playerId
+          ? { ...player, isOffline: offlineUpdate.isOffline }
+          : player
+      );
+      return { ...state, players: updatedPlayersWithOffline };
     default:
       return state;
   }

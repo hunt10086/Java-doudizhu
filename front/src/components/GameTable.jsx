@@ -278,6 +278,25 @@ const FarmerBadge = styled.div`
   }
 `;
 
+const OfflineBadge = styled.div`
+  font-size: 10px;
+  color: #999;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+
+  @media (max-width: 768px) {
+    font-size: 8px;
+    padding: 1px 4px;
+  }
+
+  @media (max-width: 480px) {
+    font-size: 6px;
+    padding: 1px 3px;
+  }
+`;
+
 // Timer components
 const TimerContainer = styled.div`
   position: relative;
@@ -521,6 +540,7 @@ const GameTable = () => {
           </PlayerName>
           {leftPlayer && isLandlord(leftPlayer.id) && <LandlordBadge>地主</LandlordBadge>}
           {leftPlayer && isFarmer(leftPlayer.id) && <FarmerBadge>农民</FarmerBadge>}
+          {leftPlayer?.isOffline && <OfflineBadge>已离线</OfflineBadge>}
           {leftPlayer && isCurrentPlayer(leftPlayer.id) && state.gameState === 'playing' && (
             <TableTimer timeLeft={timeLeft} />
           )}
@@ -583,6 +603,7 @@ const GameTable = () => {
           </PlayerName>
           {rightPlayer && isLandlord(rightPlayer.id) && <LandlordBadge>地主</LandlordBadge>}
           {rightPlayer && isFarmer(rightPlayer.id) && <FarmerBadge>农民</FarmerBadge>}
+          {rightPlayer?.isOffline && <OfflineBadge>已离线</OfflineBadge>}
           {rightPlayer && isCurrentPlayer(rightPlayer.id) && state.gameState === 'playing' && (
             <TableTimer timeLeft={timeLeft} />
           )}

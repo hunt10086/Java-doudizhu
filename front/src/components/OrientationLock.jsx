@@ -69,13 +69,15 @@ const ArrowText = styled.span`
   font-size: 14px;
 `;
 
-const checkIsMobile = () => {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+const checkIsPhone = () => {
+  const isMobileDevice = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  const isSmallScreen = window.innerWidth < 768;
+  return isMobileDevice && isSmallScreen;
 };
 
 const OrientationLock = () => {
   const [isPortrait, setIsPortrait] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isPhone, setIsPhone] = useState(false);
 
   useEffect(() => {
     const checkOrientation = () => {
@@ -83,7 +85,7 @@ const OrientationLock = () => {
     };
 
     const checkDevice = () => {
-      setIsMobile(checkIsMobile());
+      setIsPhone(checkIsPhone());
     };
 
     checkOrientation();
@@ -98,8 +100,8 @@ const OrientationLock = () => {
     };
   }, []);
 
-  // Only show overlay on mobile devices in portrait mode
-  if (!isMobile || !isPortrait) {
+  // Only show overlay on phones (not tablets) in portrait mode
+  if (!isPhone || !isPortrait) {
     return null;
   }
 

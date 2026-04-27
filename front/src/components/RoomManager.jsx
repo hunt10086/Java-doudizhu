@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import styled from "styled-components";
 import { useGame } from "../contexts/GameContext";
 import connectionManager from "../services/ConnectionManager";
@@ -109,6 +110,15 @@ const HostBadge = styled.span`
   border-radius: 10px;
   font-size: 12px;
   margin-left: 8px;
+`;
+
+const OfflineBadge = styled.span`
+  background: #e74c3c;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  margin-left: 6px;
 `;
 
 const Form = styled.form`
@@ -257,11 +267,18 @@ const LeaveButton = styled.button`
   }
 `;
 
-const RoomManager = ({ onGameStart, userInfo }) => {
+const RoomManager = ({ userInfo }) => {
   const { dispatch } = useGame();
-  const [playerName, setPlayerName] = useState(
-    userInfo?.nickname || userInfo?.username || "",
-  );
+  const navigate = useNavigate();
+
+  // 尝试从 localStorage 恢复之前保存的玩家信息
+  const [playerName, setPlayerName] = useState(() => {
+    // 优先使用用户信息，其次使用 localStorage
+    if (userInfo?.nickname || userInfo?.username) {
+      return userInfo.nickname || userInfo.username;
+    }
+    return localStorage.getItem("doudizhu_playerName") || "";
+  });
   const [roomId, setRoomId] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -284,8 +301,63 @@ const RoomManager = ({ onGameStart, userInfo }) => {
     currentRoomInfoRef.current = currentRoomInfo;
   }, [currentRoomInfo]);
 
+  // 监听从游戏返回房间的事件，重新连接 WebSocket
+  useEffect(() => {
+    const handleReturnToRoom = () => {
+      console.log('Returned to room manager, reconnecting WebSocket...');
+      // 清除之前的房间状态，显示创建/加入房间界面
+      setCurrentRoomInfo(null);
+      setRoomReady(false);
+      setRoomId("");
+      setPlayers([]);
+      setIsHost(false);
+      setError("");
+      setSuccess("");
+      // 清除 localStorage 中的游戏状态
+      localStorage.removeItem('doudizhu_gameState');
+
+      // 重新连接 WebSocket - 使用 connectionManager.isConnected() 检查实际连接状态
+      if (!connectionManager.isConnected()) {
+        console.log('WebSocket not connected, reconnecting...');
+        let playerId = localStorage.getItem("doudizhu_playerId");
+        if (!playerId) {
+          playerId = `player_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+          localStorage.setItem("doudizhu_playerId", playerId);
+        }
+
+        connectionManager.connect(playerId, (success) => {
+          console.log('Reconnection result:', success);
+          setConnected(success);
+        });
+      } else {
+        console.log('WebSocket already connected');
+        setConnected(true);
+      }
+    };
+
+    window.addEventListener('returnToRoomManager', handleReturnToRoom);
+    return () => {
+      window.removeEventListener('returnToRoomManager', handleReturnToRoom);
+    };
+  }, []);
+
   // Connect to server when component mounts
   useEffect(() => {
+    // 检查是否已经连接
+    if (connectionManager.isConnected()) {
+      console.log('Already connected to server');
+      setConnected(true);
+      // 设置 playerId
+      let playerId = localStorage.getItem("doudizhu_playerId");
+      if (!playerId) {
+        playerId = `player_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        localStorage.setItem("doudizhu_playerId", playerId);
+      }
+      setMyPlayerId(playerId);
+      dispatch({ type: "SET_MY_PLAYER_ID", payload: playerId });
+      return;
+    }
+
     // 使用localStorage持久化playerId，防止同一浏览器重复加入
     let playerId = localStorage.getItem("doudizhu_playerId");
     if (!playerId) {
@@ -302,6 +374,19 @@ const RoomManager = ({ onGameStart, userInfo }) => {
       () => {
         console.log("Connected to server");
         setConnected(true);
+
+        // 检查是否有保存的房间号，尝试自动恢复游戏
+        const savedRoomId = localStorage.getItem("doudizhu_roomId");
+        const savedPlayerName = localStorage.getItem("doudizhu_playerName") || playerName;
+        if (savedRoomId && savedPlayerName) {
+          console.log("Found saved game, attempting to reconnect...", savedRoomId);
+          setRoomId(savedRoomId);
+          // 自动尝试加入保存的房间（延迟确保订阅就绪）
+          setTimeout(() => {
+            connectionManager.joinGame(savedRoomId, savedPlayerName);
+          }, 500);
+          setSuccess("正在恢复游戏...");
+        }
       },
       (error) => {
         console.error("Connection error:", error);
@@ -332,10 +417,22 @@ const RoomManager = ({ onGameStart, userInfo }) => {
           setRoomId(roomInfo.roomId);
           setIsHost(roomInfo.isHost || false);
           setPlayers(roomInfo.players || []);
+
+          // 保存房间号和玩家名称到 localStorage，用于刷新后恢复
+          localStorage.setItem("doudizhu_roomId", roomInfo.roomId);
+          localStorage.setItem("doudizhu_playerName", currentRoomInfoRef.current?.playerName || playerName);
+
           setSuccess(`加入房间成功！房间号: ${roomInfo.roomId}`);
           console.log("Subscribing to game topic:", roomInfo.gameId);
           // Subscribe to game topic
           connectionManager.setGameId(roomInfo.gameId);
+
+          // 如果是重连且游戏正在进行中，直接导航到游戏页面
+          if (roomInfo.reconnected && (roomInfo.status === "BIDDING" || roomInfo.status === "PLAYING")) {
+            console.log("Reconnection to active game, navigating to game view");
+            // 手牌已在join response中包含，由后端直接发送
+            setTimeout(() => navigate('/game'), 100);
+          }
         } else if (data.data && data.data.id) {
           // Player joined the game (broadcast or private notification) - data is the Player object
           console.log(
@@ -388,7 +485,7 @@ const RoomManager = ({ onGameStart, userInfo }) => {
             setPlayers(data.data.players);
           }
           // Game has started, transition to game view
-          onGameStart && onGameStart();
+          navigate('/game');
           return;
         }
 
@@ -396,7 +493,18 @@ const RoomManager = ({ onGameStart, userInfo }) => {
         if (data.data && data.data.roomId && data.data.gameId) {
           // Skip if we already have room info (avoid duplicate processing)
           if (currentRoomInfo && currentRoomInfo.roomId === data.data.roomId) {
-            console.log("Duplicate room info, skipping");
+            console.log("Duplicate room info, but checking for updates...");
+            // Still process roomReady/players updates even on "duplicate"
+            if (data.data.players) {
+              setPlayers(data.data.players);
+            }
+            if (data.data.roomReady) {
+              setRoomReady(true);
+              setSuccess('房间已满，请点击"开始游戏"按钮');
+            }
+            if (data.data.message) {
+              setSuccess(data.data.message);
+            }
             return;
           }
 
@@ -419,6 +527,11 @@ const RoomManager = ({ onGameStart, userInfo }) => {
           console.log("Subscribing to game topic for host:", roomInfo.gameId);
           // Subscribe to game topic
           connectionManager.setGameId(roomInfo.gameId);
+
+          // 保存房间号和玩家名称到 localStorage，用于刷新后恢复
+          localStorage.setItem("doudizhu_roomId", roomInfo.roomId);
+          localStorage.setItem("doudizhu_playerName", playerName);
+
           return;
         }
 
@@ -446,7 +559,7 @@ const RoomManager = ({ onGameStart, userInfo }) => {
         }
 
         // Regular game start - cards dealt
-        onGameStart && onGameStart();
+        navigate('/game');
       } else if (data.type === "CARDS_DEAL") {
         // Cards dealt - check if it's for this player
         // Use ConnectionManager.getPlayerId() to get current playerId
@@ -509,6 +622,21 @@ const RoomManager = ({ onGameStart, userInfo }) => {
 
         // 重置房间状态，回到初始界面
         resetRoomState();
+      } else if (data.type === "PLAYER_OFFLINE") {
+        // 玩家离线
+        console.log("PLAYER_OFFLINE in RoomManager:", data);
+        if (data.data && data.data.playerId) {
+          setPlayers((prev) =>
+            prev.map((p) =>
+              p.id === data.data.playerId ? { ...p, isOffline: data.data.isOffline } : p
+            )
+          );
+        }
+      } else if (data.type === "ERROR") {
+        // 后端返回的错误
+        console.error("Error from server:", data.data);
+        setError(String(data.data || "操作失败"));
+        setTimeout(() => setError(""), 5000);
       }
     };
 
@@ -517,7 +645,7 @@ const RoomManager = ({ onGameStart, userInfo }) => {
     return () => {
       connectionManager.removeMessageListener(handleMessage);
     };
-  }, [myPlayerId, onGameStart, dispatch]);
+  }, [myPlayerId, navigate, dispatch]);
 
   const handleCreateGame = async (e) => {
     e.preventDefault();
@@ -607,6 +735,9 @@ const RoomManager = ({ onGameStart, userInfo }) => {
     setPlayers([]);
     setRoomReady(false);
     connectionManager.setGameId(null);
+    // 清除 localStorage 中保存的房间信息
+    localStorage.removeItem("doudizhu_roomId");
+    localStorage.removeItem("doudizhu_playerName");
   };
 
   // 退出房间
@@ -614,9 +745,12 @@ const RoomManager = ({ onGameStart, userInfo }) => {
     const gameId = currentRoomInfo?.gameId || roomId;
     if (gameId) {
       connectionManager.leaveGame();
+      // 不立即重置状态，等待后端响应
+      // 如果后端返回错误（游戏中无法离开），会收到错误消息
+      // 如果成功，会收到PLAYER_LEAVE事件，届时会重置状态
+    } else {
+      resetRoomState();
     }
-    // 无论后端是否处理，都重置前端状态
-    resetRoomState();
   };
 
   // Show room info if in a room
@@ -638,7 +772,10 @@ const RoomManager = ({ onGameStart, userInfo }) => {
             <Label>玩家列表</Label>
             {players.map((player, index) => (
               <PlayerItem key={index} $isHost={player.isHost}>
-                <span>{player.name}</span>
+                <span>
+                  {player.name}
+                  {player.isOffline && <OfflineBadge>离线</OfflineBadge>}
+                </span>
                 {player.isHost && <HostBadge>房主</HostBadge>}
               </PlayerItem>
             ))}
@@ -732,6 +869,25 @@ const RoomManager = ({ onGameStart, userInfo }) => {
 
           {!connected && <ErrorMessage>正在连接服务器...</ErrorMessage>}
         </Form>
+
+        {/* 重新连接按钮 - 当localStorage有保存的房间信息时显示 */}
+        {connected && localStorage.getItem("doudizhu_roomId") && !currentRoomInfo && (
+          <div style={{ marginTop: '12px', textAlign: 'center' }}>
+            <Button
+              $variant="warning"
+              onClick={() => {
+                const savedRoomId = localStorage.getItem("doudizhu_roomId");
+                const savedPlayerName = localStorage.getItem("doudizhu_playerName") || playerName;
+                if (savedRoomId && savedPlayerName) {
+                  connectionManager.joinGame(savedRoomId, savedPlayerName);
+                  setSuccess("正在重新连接...");
+                }
+              }}
+            >
+              重新连接到之前的房间
+            </Button>
+          </div>
+        )}
 
         {error && <ErrorMessage>{error}</ErrorMessage>}
         {success && <SuccessMessage>{success}</SuccessMessage>}

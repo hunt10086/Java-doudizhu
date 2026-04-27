@@ -2,6 +2,8 @@ package com.game.doudizhu.controller;
 
 import com.game.doudizhu.model.GameEvent;
 import com.game.doudizhu.service.GameService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -16,6 +18,8 @@ import java.util.Map;
 @Controller
 public class GameController {
 
+    private static final Logger log = LoggerFactory.getLogger(GameController.class);
+
     @Autowired
     private GameService gameService;
 
@@ -29,12 +33,12 @@ public class GameController {
     public void createGame(@Payload GameEvent event) {
         String playerId = event.getPlayerId();
         String playerName = (String) event.getData();
-        System.out.println("=== CREATE GAME === playerId: " + playerId + ", playerName: " + playerName);
+        log.info("=== CREATE GAME === playerId: {}, playerName: {}", playerId, playerName);
 
         try {
             // Create game via service
             com.game.doudizhu.model.GameState gameState = gameService.createGame(playerId, playerName);
-            System.out.println("Game created: " + gameState.getGameId() + ", roomId: " + gameState.getRoomId());
+            log.info("Game created: {}, roomId: {}", gameState.getGameId(), gameState.getRoomId());
 
             // Send game created event back to the creator with room info (only basic player info)
             Map<String, Object> roomInfo = new HashMap<>();
@@ -52,16 +56,16 @@ public class GameController {
             );
 
             String topic = "/topic/game/created_" + playerId;
-            System.out.println("Sending to topic: " + topic);
+            log.debug("Sending to topic: {}", topic);
             // Send to a player-specific topic that the creator will subscribe to
             messagingTemplate.convertAndSend(topic, createdEvent);
-            System.out.println("Message sent successfully");
+            log.debug("Message sent successfully");
         } catch (Exception e) {
-            System.out.println("Error creating game: " + e.getMessage());
+            log.error("Error creating game: {}", e.getMessage());
             e.printStackTrace();
             // Handle error - broadcast error to the specific player via topic
             GameEvent errorEvent = new GameEvent(
-                GameEvent.EventType.PLAYER_DISCONNECT,
+                GameEvent.EventType.ERROR,
                 null,
                 playerId,
                 "Error creating game: " + e.getMessage()
@@ -100,14 +104,14 @@ public class GameController {
 
             messagingTemplate.convertAndSend("/topic/game/joined_" + playerId, joinEvent);
         } catch (Exception e) {
-            // Handle error
+            // Handle error - send to user's error queue
             GameEvent errorEvent = new GameEvent(
-                GameEvent.EventType.PLAYER_DISCONNECT,
+                GameEvent.EventType.ERROR,
                 gameId,
                 playerId,
                 "Error joining game: " + e.getMessage()
             );
-            messagingTemplate.convertAndSend("/topic/game/error_" + playerId, errorEvent);
+            messagingTemplate.convertAndSendToUser(playerId, "/queue/errors", errorEvent);
         }
     }
 
@@ -140,7 +144,7 @@ public class GameController {
         } catch (Exception e) {
             // Handle error appropriately
             GameEvent errorEvent = new GameEvent(
-                GameEvent.EventType.PLAYER_DISCONNECT, // Reusing this for errors
+                GameEvent.EventType.ERROR, // Reusing this for errors
                 gameId,
                 event.getPlayerId(),
                 "Error starting game: " + e.getMessage()
@@ -163,7 +167,7 @@ public class GameController {
         } catch (Exception e) {
             // Handle error appropriately
             GameEvent errorEvent = new GameEvent(
-                GameEvent.EventType.PLAYER_DISCONNECT,
+                GameEvent.EventType.ERROR,
                 gameId,
                 playerId,
                 "Error starting next round: " + e.getMessage()
@@ -187,7 +191,7 @@ public class GameController {
         } catch (Exception e) {
             // Handle error appropriately
             GameEvent errorEvent = new GameEvent(
-                GameEvent.EventType.PLAYER_DISCONNECT, // Reusing this for errors
+                GameEvent.EventType.ERROR, // Reusing this for errors
                 gameId,
                 playerId,
                 "Error processing bid: " + e.getMessage()
@@ -225,7 +229,7 @@ public class GameController {
         } catch (Exception e) {
             // Handle error appropriately
             GameEvent errorEvent = new GameEvent(
-                GameEvent.EventType.PLAYER_DISCONNECT, // Reusing this for errors
+                GameEvent.EventType.ERROR, // Reusing this for errors
                 gameId,
                 playerId,
                 "Error processing play: " + e.getMessage()
@@ -248,7 +252,7 @@ public class GameController {
         } catch (Exception e) {
             // Handle error appropriately
             GameEvent errorEvent = new GameEvent(
-                GameEvent.EventType.PLAYER_DISCONNECT, // Reusing this for errors
+                GameEvent.EventType.ERROR, // Reusing this for errors
                 gameId,
                 playerId,
                 "Error processing pass: " + e.getMessage()
@@ -265,7 +269,7 @@ public class GameController {
     public void leaveGame(@Payload GameEvent event) {
         String gameId = event.getGameId();
         String playerId = event.getPlayerId();
-        System.out.println("=== LEAVE GAME === playerId: " + playerId + ", gameId: " + gameId);
+        log.info("=== LEAVE GAME === playerId: {}, gameId: {}", playerId, gameId);
 
         try {
             boolean success = gameService.leaveGame(gameId, playerId);
@@ -281,7 +285,7 @@ public class GameController {
                 messagingTemplate.convertAndSendToUser(playerId, "/queue/errors", errorEvent);
             }
         } catch (Exception e) {
-            System.out.println("Error leaving game: " + e.getMessage());
+            log.error("Error leaving game: {}", e.getMessage());
             e.printStackTrace();
 
             GameEvent errorEvent = new GameEvent(

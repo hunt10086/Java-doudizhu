@@ -15,7 +15,9 @@ public class GameEvent {
         NEXT_ROUND,
         TURN_START,
         PLAYER_LEAVE,
-        GAME_DESTROYED
+        GAME_DESTROYED,
+        PLAYER_OFFLINE,
+        ERROR
     }
 
     private EventType type;

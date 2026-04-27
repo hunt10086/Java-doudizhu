@@ -29,7 +29,9 @@
       "mcp__chrome-devtools__list_pages",
       "mcp__chrome-devtools__click",
       "WebFetch(domain:minimax-algeng-chat-tts.oss-cn-wulanchabu.aliyuncs.com)",
-      "mcp__chrome-devtools__wait_for"
+      "mcp__chrome-devtools__wait_for",
+      "Bash(mvnw.cmd compile:*)",
+      "Bash(npx vite *)"
     ]
   }
 }

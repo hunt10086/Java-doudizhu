@@ -1,6 +1,8 @@
 package com.game.doudizhu.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.lang.NonNull;
 import org.springframework.messaging.Message;
@@ -16,10 +18,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @Configuration
 public class WebSocketChannelInterceptor implements ChannelInterceptor {
 
+    private static final Logger log = LoggerFactory.getLogger(WebSocketChannelInterceptor.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     // Track active sessions: sessionId -> gameId/playerId info
     private static final Map<String, SessionInfo> activeSessions = new ConcurrentHashMap<>();
+
+    // Reverse mapping: playerId -> sessionId, for handling reconnection/session migration
+    private static final Map<String, String> playerSessionMap = new ConcurrentHashMap<>();
 
     public static class SessionInfo {
         String gameId;
@@ -34,13 +40,27 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
     // Register a session when player joins a game
     public static void registerSession(String sessionId, String gameId, String playerId) {
         activeSessions.put(sessionId, new SessionInfo(gameId, playerId));
-        System.out.println("Session registered: " + sessionId + " -> gameId: " + gameId + ", playerId: " + playerId);
+
+        // Handle session migration: if same playerId connects from new session,
+        // clean up the old session entry
+        if (playerId != null) {
+            String oldSessionId = playerSessionMap.put(playerId, sessionId);
+            if (oldSessionId != null && !oldSessionId.equals(sessionId)) {
+                log.info("Player {} migrated from session {} to {}", playerId, oldSessionId, sessionId);
+                activeSessions.remove(oldSessionId);
+            }
+        }
+
+        log.debug("Session registered: {} -> gameId: {}, playerId: {}", sessionId, gameId, playerId);
     }
 
     // Remove session registration
     public static void removeSession(String sessionId) {
-        activeSessions.remove(sessionId);
-        System.out.println("Session removed: " + sessionId);
+        SessionInfo info = activeSessions.remove(sessionId);
+        if (info != null && info.playerId != null) {
+            playerSessionMap.remove(info.playerId, sessionId);
+        }
+        log.debug("Session removed: {}", sessionId);
     }
 
     // Get session info
@@ -57,26 +77,55 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
 
             // Handle CONNECT - log connection
             if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-                System.out.println("WebSocket CONNECT received, sessionId: " + sessionId);
+                log.info("WebSocket CONNECT received, sessionId: {}", sessionId);
+            }
+
+            // Handle DISCONNECT - clean up session
+            if (StompCommand.DISCONNECT.equals(accessor.getCommand())) {
+                SessionInfo sessionInfo = activeSessions.get(sessionId);
+                if (sessionInfo != null) {
+                    // Check if this session was already superseded by a newer one
+                    String mappedSessionId = playerSessionMap.get(sessionInfo.playerId);
+                    if (mappedSessionId != null && !mappedSessionId.equals(sessionId)) {
+                        log.info("DISCONNECT from old session {}, player {} has newer session {}, ignoring",
+                            sessionId, sessionInfo.playerId, mappedSessionId);
+                        activeSessions.remove(sessionId);
+                        return message;
+                    }
+
+                    log.info("WebSocket DISCONNECT - sessionId: {}, playerId: {}, gameId: {}",
+                        sessionId, sessionInfo.playerId, sessionInfo.gameId);
+                    removeSession(sessionId);
+
+                    // Notify GameService that player disconnected
+                    if (sessionInfo.gameId != null && sessionInfo.playerId != null) {
+                        try {
+                            com.game.doudizhu.service.GameService gameService =
+                                SpringContextHelper.getBean(com.game.doudizhu.service.GameService.class);
+                            gameService.handlePlayerDisconnect(sessionInfo.gameId, sessionInfo.playerId);
+                        } catch (Exception e) {
+                            log.error("Error notifying GameService of disconnect: {}", e.getMessage());
+                        }
+                    }
+                }
             }
 
             // Handle SEND - check for game join/create messages to register session
             if (StompCommand.SEND.equals(accessor.getCommand())) {
                 String destination = accessor.getDestination();
                 if (destination != null) {
-                    // Handle game creation - store playerId temporarily
+                    // Handle game creation - store playerId in native header (not in activeSessions with null gameId)
                     if (destination.equals("/app/game/create")) {
                         try {
                             String body = new String((byte[]) message.getPayload());
                             Map<String, Object> data = objectMapper.readValue(body, Map.class);
                             String playerId = (String) data.get("playerId");
-                            // Temporarily register with null gameId, will update when game topic is subscribed
                             if (playerId != null) {
-                                activeSessions.put(sessionId, new SessionInfo(null, playerId));
+                                accessor.setNativeHeader("pendingPlayerId", playerId);
                             }
-                            System.out.println("Game create request from player: " + playerId + ", sessionId: " + sessionId);
+                            log.debug("Game create request from player: {}, sessionId: {}", playerId, sessionId);
                         } catch (Exception e) {
-                            System.out.println("Error parsing create message: " + e.getMessage());
+                            log.error("Error parsing create message", e);
                         }
                     }
                     // Handle game join
@@ -89,31 +138,29 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
                             if (playerId != null && gameId != null) {
                                 registerSession(sessionId, gameId, playerId);
                             }
-                            System.out.println("Game join request - player: " + playerId + ", gameId: " + gameId + ", sessionId: " + sessionId);
+                            log.debug("Game join request - player: {}, gameId: {}, sessionId: {}", playerId, gameId, sessionId);
                         } catch (Exception e) {
-                            System.out.println("Error parsing join message: " + e.getMessage());
+                            log.error("Error parsing join message", e);
                         }
                     }
                 }
             }
 
-            // Handle SUBSCRIBE - update gameId for game creation case
+            // Handle SUBSCRIBE - register session from pending game creation
             if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
                 String destination = accessor.getDestination();
                 if (destination != null && destination.startsWith("/topic/game/")) {
-                    // Extract gameId from topic
                     String gameId = destination.replace("/topic/game/", "");
-                    // Remove /chat suffix if present
                     if (gameId.contains("/chat")) {
                         gameId = gameId.replace("/chat", "");
                     }
 
-                    // Check if we have a pending session (from game creation)
-                    SessionInfo existingInfo = activeSessions.get(sessionId);
-                    if (existingInfo != null && existingInfo.gameId == null && existingInfo.playerId != null) {
-                        // This is a game creation - update with the gameId
-                        registerSession(sessionId, gameId, existingInfo.playerId);
-                        System.out.println("Updated session after game creation - sessionId: " + sessionId + ", gameId: " + gameId);
+                    // Get pending playerId from native headers (set during SEND frame for game/create)
+                    String pendingPlayerId = accessor.getFirstNativeHeader("pendingPlayerId");
+                    if (pendingPlayerId != null) {
+                        registerSession(sessionId, gameId, pendingPlayerId);
+                        log.info("Registered session after game creation - sessionId: {}, gameId: {}, playerId: {}",
+                            sessionId, gameId, pendingPlayerId);
                     }
                 }
             }

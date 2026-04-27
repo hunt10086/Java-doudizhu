@@ -8,18 +8,20 @@ const AuthContainer = styled.div`
   left: 0;
   width: 100%;
   height: 100%;
+  height: 100dvh;
   background-image: linear-gradient(to top, #fbc2eb 0%, #a6c1ee 100%);
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   overflow-y: auto;
   z-index: 1000;
-  padding: 20px 0;
+  padding: 10px;
   box-sizing: border-box;
 
-  @media (min-height: 600px) {
-    align-items: center;
-    padding: 0;
+  @media (max-height: 500px) {
+    align-items: flex-start;
+    padding-top: 10px;
+    padding-bottom: 20px;
   }
 `;
 
@@ -28,12 +30,18 @@ const AuthBox = styled.div`
   border-radius: 10px;
   padding: 20px;
   width: 400px;
-  max-width: 90%;
+  max-width: 95%;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   box-sizing: border-box;
+  margin: 10px 0;
 
   @media (min-height: 600px) {
     padding: 30px;
+  }
+
+  @media (max-height: 500px) {
+    padding: 12px;
+    border-radius: 8px;
   }
 `;
 
@@ -47,6 +55,11 @@ const Title = styled.h2`
     margin-bottom: 25px;
     font-size: 24px;
   }
+
+  @media (max-height: 500px) {
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
 `;
 
 const TabContainer = styled.div`
@@ -56,6 +69,10 @@ const TabContainer = styled.div`
 
   @media (min-height: 600px) {
     margin-bottom: 20px;
+  }
+
+  @media (max-height: 500px) {
+    margin-bottom: 8px;
   }
 `;
 
@@ -82,6 +99,10 @@ const Form = styled.form`
 
   @media (min-height: 600px) {
     gap: 15px;
+  }
+
+  @media (max-height: 500px) {
+    gap: 6px;
   }
 `;
 
@@ -215,7 +236,6 @@ const Auth = ({ onLoginSuccess }) => {
 
       if (response.data.success) {
         if (isLogin) {
-          // Login successful - save user info and call callback
           const userInfo = {
             userId: response.data.userId,
             username: response.data.username,
