@@ -343,9 +343,9 @@ const RoomManager = ({ userInfo }) => {
 
   // Connect to server when component mounts
   useEffect(() => {
-    // 检查是否已经连接
+    // 检查是否已经连接（ConnectionInitializer 在 App 级别已处理连接）
     if (connectionManager.isConnected()) {
-      console.log('Already connected to server');
+      console.log('Already connected to server (by ConnectionInitializer)');
       setConnected(true);
       // 设置 playerId
       let playerId = localStorage.getItem("doudizhu_playerId");
@@ -355,44 +355,33 @@ const RoomManager = ({ userInfo }) => {
       }
       setMyPlayerId(playerId);
       dispatch({ type: "SET_MY_PLAYER_ID", payload: playerId });
+
+      // 检查是否有保存的房间号，尝试自动恢复游戏
+      const savedRoomId = localStorage.getItem("doudizhu_roomId");
+      const savedGameId = localStorage.getItem("doudizhu_gameId");
+      const savedPlayerName = localStorage.getItem("doudizhu_playerName") || playerName;
+      if (savedPlayerName) {
+        const joinTargetId = savedGameId || savedRoomId;
+        if (joinTargetId) {
+          console.log("Found saved game, attempting to reconnect from RoomManager...", joinTargetId);
+          setRoomId(savedRoomId || joinTargetId);
+          setTimeout(() => {
+            connectionManager.joinGame(joinTargetId, savedPlayerName);
+          }, 500);
+          setSuccess("正在恢复游戏...");
+        }
+      }
       return;
     }
 
-    // 使用localStorage持久化playerId，防止同一浏览器重复加入
+    // 连接由 App 级别的 ConnectionInitializer 处理，这里只做重连逻辑
     let playerId = localStorage.getItem("doudizhu_playerId");
     if (!playerId) {
       playerId = `player_${Date.now()}_${Math.random().toString(36).substring(7)}`;
       localStorage.setItem("doudizhu_playerId", playerId);
     }
     setMyPlayerId(playerId);
-
-    // Set my player ID in context
     dispatch({ type: "SET_MY_PLAYER_ID", payload: playerId });
-
-    connectionManager.connect(
-      playerId,
-      () => {
-        console.log("Connected to server");
-        setConnected(true);
-
-        // 检查是否有保存的房间号，尝试自动恢复游戏
-        const savedRoomId = localStorage.getItem("doudizhu_roomId");
-        const savedPlayerName = localStorage.getItem("doudizhu_playerName") || playerName;
-        if (savedRoomId && savedPlayerName) {
-          console.log("Found saved game, attempting to reconnect...", savedRoomId);
-          setRoomId(savedRoomId);
-          // 自动尝试加入保存的房间（延迟确保订阅就绪）
-          setTimeout(() => {
-            connectionManager.joinGame(savedRoomId, savedPlayerName);
-          }, 500);
-          setSuccess("正在恢复游戏...");
-        }
-      },
-      (error) => {
-        console.error("Connection error:", error);
-        setError("无法连接到游戏服务器");
-      },
-    );
   }, [dispatch]);
 
   // Listen for game events
@@ -418,19 +407,50 @@ const RoomManager = ({ userInfo }) => {
           setIsHost(roomInfo.isHost || false);
           setPlayers(roomInfo.players || []);
 
-          // 保存房间号和玩家名称到 localStorage，用于刷新后恢复
+          // 保存房间号、游戏ID和玩家名称到 localStorage，用于刷新后恢复
           localStorage.setItem("doudizhu_roomId", roomInfo.roomId);
-          localStorage.setItem("doudizhu_playerName", currentRoomInfoRef.current?.playerName || playerName);
+          localStorage.setItem("doudizhu_gameId", roomInfo.gameId);
+          localStorage.setItem("doudizhu_playerName", playerName);
 
           setSuccess(`加入房间成功！房间号: ${roomInfo.roomId}`);
           console.log("Subscribing to game topic:", roomInfo.gameId);
           // Subscribe to game topic
           connectionManager.setGameId(roomInfo.gameId);
 
-          // 如果是重连且游戏正在进行中，直接导航到游戏页面
+          // 如果是重连且游戏正在进行中，先恢复游戏状态再导航到游戏页面
           if (roomInfo.reconnected && (roomInfo.status === "BIDDING" || roomInfo.status === "PLAYING")) {
-            console.log("Reconnection to active game, navigating to game view");
-            // 手牌已在join response中包含，由后端直接发送
+            console.log("Reconnection to active game, restoring game state and navigating to game view");
+            // 恢复游戏状态到 GameContext
+            dispatch({ type: 'SET_GAME_STATE', payload: roomInfo.gameStatus ? roomInfo.gameStatus.toLowerCase() : roomInfo.status.toLowerCase() });
+            dispatch({ type: 'SET_PLAYERS', payload: roomInfo.players || [] });
+            if (roomInfo.handCards) {
+              dispatch({ type: 'SET_HAND_CARDS', payload: roomInfo.handCards });
+            }
+            if (roomInfo.landlordId) {
+              dispatch({ type: 'SET_LANDLORD', payload: roomInfo.landlordId });
+            }
+            if (roomInfo.landlordCards) {
+              dispatch({ type: 'SET_LANDLORD_CARDS', payload: roomInfo.landlordCards });
+            }
+            if (roomInfo.currentCards) {
+              dispatch({ type: 'SET_CURRENT_CARDS', payload: roomInfo.currentCards });
+            }
+            if (roomInfo.currentPlayerId) {
+              dispatch({ type: 'SET_CURRENT_PLAYER', payload: { id: roomInfo.currentPlayerId } });
+            }
+            if (roomInfo.playerCardCounts) {
+              dispatch({ type: 'SET_PLAYER_CARD_COUNTS', payload: roomInfo.playerCardCounts });
+            }
+            if (roomInfo.playerLandlordStatus && roomInfo.players) {
+              const updatedPlayers = roomInfo.players.map(p => ({
+                ...p,
+                isLandlord: roomInfo.playerLandlordStatus[p.id] || false
+              }));
+              dispatch({ type: 'SET_PLAYERS', payload: updatedPlayers });
+            }
+            if (roomInfo.canPass !== undefined) {
+              dispatch({ type: 'SET_CAN_PASS', payload: roomInfo.canPass });
+            }
             setTimeout(() => navigate('/game'), 100);
           }
         } else if (data.data && data.data.id) {
@@ -528,8 +548,9 @@ const RoomManager = ({ userInfo }) => {
           // Subscribe to game topic
           connectionManager.setGameId(roomInfo.gameId);
 
-          // 保存房间号和玩家名称到 localStorage，用于刷新后恢复
+          // 保存房间号、游戏ID和玩家名称到 localStorage，用于刷新后恢复
           localStorage.setItem("doudizhu_roomId", roomInfo.roomId);
+          localStorage.setItem("doudizhu_gameId", roomInfo.gameId);
           localStorage.setItem("doudizhu_playerName", playerName);
 
           return;
@@ -737,6 +758,7 @@ const RoomManager = ({ userInfo }) => {
     connectionManager.setGameId(null);
     // 清除 localStorage 中保存的房间信息
     localStorage.removeItem("doudizhu_roomId");
+    localStorage.removeItem("doudizhu_gameId");
     localStorage.removeItem("doudizhu_playerName");
   };
 
@@ -877,9 +899,11 @@ const RoomManager = ({ userInfo }) => {
               $variant="warning"
               onClick={() => {
                 const savedRoomId = localStorage.getItem("doudizhu_roomId");
+                const savedGameId = localStorage.getItem("doudizhu_gameId");
                 const savedPlayerName = localStorage.getItem("doudizhu_playerName") || playerName;
-                if (savedRoomId && savedPlayerName) {
-                  connectionManager.joinGame(savedRoomId, savedPlayerName);
+                const joinTargetId = savedGameId || savedRoomId;
+                if (joinTargetId && savedPlayerName) {
+                  connectionManager.joinGame(joinTargetId, savedPlayerName);
                   setSuccess("正在重新连接...");
                 }
               }}

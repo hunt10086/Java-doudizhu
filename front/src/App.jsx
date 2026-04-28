@@ -265,7 +265,55 @@ const MessageHandler = ({ onGameStart, onGameJoined, showToastRef }) => {
 
       switch (data.type) {
         case 'PLAYER_JOIN':
-          if (data.data && data.data.id) {
+          console.log('PLAYER_JOIN:', data.data);
+          // Handle reconnection response (data contains roomId + full game state)
+          if (data.data && data.data.roomId && data.data.reconnected) {
+            console.log('Reconnection PLAYER_JOIN, restoring game state');
+            // Restore full game state from reconnection data
+            if (data.data.gameStatus) {
+              dispatch({ type: 'SET_GAME_STATE', payload: data.data.gameStatus.toLowerCase() });
+            } else if (data.data.status) {
+              dispatch({ type: 'SET_GAME_STATE', payload: data.data.status.toLowerCase() });
+            }
+            if (data.data.players) {
+              dispatch({ type: 'SET_PLAYERS', payload: data.data.players });
+            }
+            if (data.data.handCards) {
+              dispatch({ type: 'SET_HAND_CARDS', payload: data.data.handCards });
+            }
+            if (data.data.landlordId) {
+              dispatch({ type: 'SET_LANDLORD', payload: data.data.landlordId });
+            }
+            if (data.data.landlordCards) {
+              dispatch({ type: 'SET_LANDLORD_CARDS', payload: data.data.landlordCards });
+            }
+            if (data.data.currentCards) {
+              dispatch({ type: 'SET_CURRENT_CARDS', payload: data.data.currentCards });
+            }
+            if (data.data.currentPlayerId) {
+              dispatch({ type: 'SET_CURRENT_PLAYER', payload: { id: data.data.currentPlayerId } });
+            }
+            if (data.data.playerCardCounts) {
+              dispatch({ type: 'SET_PLAYER_CARD_COUNTS', payload: data.data.playerCardCounts });
+            }
+            if (data.data.playerLandlordStatus && data.data.players) {
+              const updatedPlayers = data.data.players.map(p => ({
+                ...p,
+                isLandlord: data.data.playerLandlordStatus[p.id] || false
+              }));
+              dispatch({ type: 'SET_PLAYERS', payload: updatedPlayers });
+            }
+            if (data.data.canPass !== undefined) {
+              dispatch({ type: 'SET_CAN_PASS', payload: data.data.canPass });
+            }
+            // Set myPlayerId if not set
+            if (data.playerId && !currentState.myPlayerId) {
+              dispatch({ type: 'SET_MY_PLAYER_ID', payload: data.playerId });
+            }
+            if (data.data.gameId) {
+              ConnectionManager.setGameId(data.data.gameId);
+            }
+          } else if (data.data && data.data.id) {
             console.log('Player joined:', data.data);
             // Add player to state if not already present
             const existingPlayer = currentState.players?.find(p => p.id === data.data.id);
@@ -602,6 +650,40 @@ const ScreenShakeEffect = () => {
   );
 };
 
+// Connection initializer - ensures WebSocket stays connected across routes
+function ConnectionInitializer() {
+  const { dispatch } = useGame();
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if (initialized.current) return;
+    if (ConnectionManager.isConnected()) {
+      initialized.current = true;
+      return;
+    }
+
+    let playerId = localStorage.getItem("doudizhu_playerId");
+    if (!playerId) {
+      playerId = `player_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+      localStorage.setItem("doudizhu_playerId", playerId);
+    }
+    dispatch({ type: 'SET_MY_PLAYER_ID', payload: playerId });
+
+    ConnectionManager.connect(
+      playerId,
+      () => {
+        console.log('App-level: Connected to server');
+        initialized.current = true;
+      },
+      (error) => {
+        console.error('App-level: Connection error:', error);
+      }
+    );
+  }, [dispatch]);
+
+  return null;
+}
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
@@ -680,6 +762,7 @@ function App() {
       <GameProvider initialState={initialGameState}>
         <GlobalStyle />
         <OrientationLock />
+        <ConnectionInitializer />
         <MessageHandler
           onGameStart={handleGameStart}
           onGameJoined={handleGameJoined}
@@ -751,6 +834,10 @@ function GamePage({ toastRef }) {
       console.log('Leaving room...');
       ConnectionManager.leaveGame();
       ConnectionManager.disconnect();
+      // Clear saved room info so we don't auto-rejoin
+      localStorage.removeItem('doudizhu_roomId');
+      localStorage.removeItem('doudizhu_gameId');
+      localStorage.removeItem('doudizhu_playerName');
       // Reset game state
       dispatch({ type: 'SET_GAME_STATE', payload: 'waiting' });
       dispatch({ type: 'SET_PLAYERS', payload: [] });

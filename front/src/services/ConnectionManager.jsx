@@ -40,12 +40,18 @@ class ConnectionManager {
 
         // Auto-rejoin if we have saved room info in localStorage (STOMP reconnect after refresh)
         const savedRoomId = localStorage.getItem("doudizhu_roomId");
+        const savedGameId = localStorage.getItem("doudizhu_gameId");
         const savedPlayerName = localStorage.getItem("doudizhu_playerName");
-        if (savedRoomId && savedPlayerName && !this.gameId) {
-          console.log('STOMP reconnected with saved room, auto-rejoining:', savedRoomId);
-          setTimeout(() => {
-            this.joinGame(savedRoomId, savedPlayerName);
-          }, 300);
+        if (savedPlayerName && !this.gameId) {
+          const joinTargetId = savedGameId || savedRoomId;
+          if (joinTargetId) {
+            console.log('STOMP reconnected with saved room, auto-rejoining:', joinTargetId);
+            this._autoRejoining = true;
+            setTimeout(() => {
+              this._autoRejoining = false;
+              this.joinGame(joinTargetId, savedPlayerName);
+            }, 300);
+          }
         }
 
         if (onConnected) {
