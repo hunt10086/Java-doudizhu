@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import styled, { createGlobalStyle, keyframes } from 'styled-components';
 import GameTable from './components/GameTable';
 import GameControls from './components/GameControls';
@@ -247,13 +247,18 @@ const HandCard = styled.div`
   animation-fill-mode: both;
 `;
 
-// Message handler component
-const MessageHandler = ({ onGameStart, onGameJoined, showToast }) => {
+// Message handler component - uses ref for state to avoid stale closures
+// This component should be mounted at App level to persist across route changes
+const MessageHandler = ({ onGameStart, onGameJoined, showToastRef }) => {
   const { state, dispatch } = useGame();
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const handleMessage = (data) => {
+      // Use ref to always get current state
+      const currentState = stateRef.current;
       // Get current playerId from ConnectionManager
       const currentPlayerId = ConnectionManager.getPlayerId();
       console.log('Received game event:', data, 'myPlayerId:', currentPlayerId);
@@ -263,7 +268,7 @@ const MessageHandler = ({ onGameStart, onGameJoined, showToast }) => {
           if (data.data && data.data.id) {
             console.log('Player joined:', data.data);
             // Add player to state if not already present
-            const existingPlayer = state.players?.find(p => p.id === data.data.id);
+            const existingPlayer = currentState.players?.find(p => p.id === data.data.id);
             if (!existingPlayer && data.data.name) {
               const newPlayer = {
                 id: data.data.id,
@@ -317,7 +322,7 @@ const MessageHandler = ({ onGameStart, onGameJoined, showToast }) => {
               }
               if (data.data.playerLandlordStatus) {
                 // Update players with landlord status
-                const currentPlayers = state.players || [];
+                const currentPlayers = currentState.players || [];
                 const updatedPlayers = currentPlayers.map(p => ({
                   ...p,
                   isLandlord: data.data.playerLandlordStatus[p.id] || false
@@ -450,8 +455,8 @@ const MessageHandler = ({ onGameStart, onGameJoined, showToast }) => {
             }
             if (playData.playerWon) {
               // Find the winner player info - prefer playerName from server, fallback to local lookup
-              console.log('Player won, looking for player:', playData.playerId, 'in players:', state.players, 'playerName from server:', playData.playerName);
-              const winnerPlayer = state.players?.find(p => p.id === playData.playerId);
+              console.log('Player won, looking for player:', playData.playerId, 'in players:', currentState.players, 'playerName from server:', playData.playerName);
+              const winnerPlayer = currentState.players?.find(p => p.id === playData.playerId);
               console.log('Found winnerPlayer:', winnerPlayer);
               // Use server-provided name if available, otherwise use local player name
               const winnerName = playData.playerName || winnerPlayer?.name || '未知玩家';
@@ -500,7 +505,7 @@ const MessageHandler = ({ onGameStart, onGameJoined, showToast }) => {
           console.log('Player disconnected or error:', data.playerId, data.data);
           // 如果有错误消息，显示错误提示
           if (data.data) {
-            showToast(data.data, 'error');
+            showToastRef?.current?.(data.data, 'error');
             // 如果是加入游戏失败，返回房间界面
             if (data.data.includes('Error joining game')) {
               onGameStart && onGameStart();
@@ -511,7 +516,7 @@ const MessageHandler = ({ onGameStart, onGameJoined, showToast }) => {
         case 'GAME_DESTROYED':
           // 房间被解散（房主离开或所有玩家离开）
           console.log('Game destroyed:', data.data);
-          showToast(data.data || '房间已解散', 'error');
+          showToastRef?.current?.(data.data || '房间已解散', 'error');
           ConnectionManager.disconnect();
           window.dispatchEvent(new Event('returnToRoomManager'));
           onGameStart && onGameStart();
@@ -521,7 +526,7 @@ const MessageHandler = ({ onGameStart, onGameJoined, showToast }) => {
           // 后端返回的错误消息
           console.log('Error from server:', data.data);
           if (data.data) {
-            showToast(String(data.data), 'error');
+            showToastRef?.current?.(String(data.data), 'error');
             // 如果是加入游戏失败，返回房间界面
             if (String(data.data).includes('Error joining game')) {
               onGameStart && onGameStart();
@@ -547,9 +552,7 @@ const MessageHandler = ({ onGameStart, onGameJoined, showToast }) => {
           // 处理玩家离开房间的错误（如游戏中无法离开）
           if (data.data && typeof data.data === 'string') {
             console.log('Player leave error:', data.data);
-            if (showToast) {
-              showToast(data.data, 'error');
-            }
+            showToastRef?.current?.(data.data, 'error');
           }
           break;
 
@@ -564,9 +567,7 @@ const MessageHandler = ({ onGameStart, onGameJoined, showToast }) => {
                 isOffline: data.data.isOffline
               }
             });
-            if (showToast) {
-              showToast(`${data.data.playerName || '玩家'} 已离线`, 'info');
-            }
+            showToastRef?.current?.(`${data.data.playerName || '玩家'} 已离线`, 'info');
           }
           break;
 
@@ -580,7 +581,7 @@ const MessageHandler = ({ onGameStart, onGameJoined, showToast }) => {
     return () => {
       ConnectionManager.removeMessageListener(handleMessage);
     };
-  }, [dispatch, onGameStart, showToast]);
+  }, [dispatch, onGameStart, onGameJoined, showToastRef]);
 
   return null;
 };
@@ -605,6 +606,21 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Toast ref that GamePage sets on mount - used by MessageHandler
+  // Toast ref that GamePage sets on mount - used by MessageHandler
+  const toastRef = useRef(null);
+
+  const handleGameStart = useCallback(() => {
+    if (window.location.pathname !== '/room' && window.location.pathname !== '/') {
+      window.location.href = '/room';
+    }
+  }, []);
+
+  const handleGameJoined = useCallback(() => {
+    if (window.location.pathname !== '/game') {
+      window.location.href = '/game';
+    }
+  }, []);
 
   const initialGameState = {
     players: [],
@@ -664,11 +680,16 @@ function App() {
       <GameProvider initialState={initialGameState}>
         <GlobalStyle />
         <OrientationLock />
+        <MessageHandler
+          onGameStart={handleGameStart}
+          onGameJoined={handleGameJoined}
+          showToastRef={toastRef}
+        />
         {isLoggedIn ? (
           <Routes>
             <Route path="/" element={<RoomManager userInfo={userInfo} />} />
             <Route path="/room" element={<RoomManager userInfo={userInfo} />} />
-            <Route path="/game" element={<GamePage />} />
+            <Route path="/game" element={<GamePage toastRef={toastRef} />} />
           </Routes>
         ) : (
           <Auth onLoginSuccess={handleLoginSuccess} />
@@ -678,12 +699,29 @@ function App() {
   );
 }
 
-// Game page component with its own state
-function GamePage() {
+// Game page component
+function GamePage({ toastRef }) {
   const { state, dispatch } = useGame();
   const navigate = useNavigate();
   const [toast, setToast] = useState(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+
+  const showToast = useCallback((message, type = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  // Register toast ref so MessageHandler can use it
+  useEffect(() => {
+    if (toastRef) {
+      toastRef.current = showToast;
+    }
+    return () => {
+      if (toastRef) {
+        toastRef.current = null;
+      }
+    };
+  }, [toastRef, showToast]);
 
   // Listen for connection status changes
   useEffect(() => {
@@ -693,11 +731,6 @@ function GamePage() {
     ConnectionManager.addConnectionListener(handleConnectionChange);
     return () => ConnectionManager.removeConnectionListener(handleConnectionChange);
   }, []);
-
-  const showToast = (message, type = 'info') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
 
   // Warn before leaving page during active game
   useEffect(() => {
@@ -734,11 +767,6 @@ function GamePage() {
 
   return (
     <>
-      <MessageHandler
-        onGameStart={() => navigate('/room')}
-        onGameJoined={() => {}}
-        showToast={showToast}
-      />
       <AppContainer>
         <ScreenShakeEffect />
         <GameBackground />
